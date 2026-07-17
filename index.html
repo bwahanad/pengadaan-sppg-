@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Pengadaan Bahan Baku SPPG</title>
+<meta name="theme-color" content="#2F4A34">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --bg:#F6F7F1; --paper:#FFFFFF; --ink:#1E2A20; --ink-soft:#5C6B5E;
+    --leaf:#2F4A34; --leaf-dark:#1F3324; --turmeric:#D9A441; --turmeric-dark:#B8842A;
+    --line:#E3E6DD; --danger:#B8493D; --ok:#3E7A4F; --wait:#B8842A;
+    --radius:14px; --shadow: 0 1px 2px rgba(30,42,32,.06), 0 8px 24px -12px rgba(30,42,32,.18);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg); color:var(--ink); font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh;}
+  h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif; letter-spacing:-0.01em;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  button{font-family:inherit;}
+
+  /* ===== Login / Picker screens ===== */
+  .center-screen{
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+    background: radial-gradient(circle at 15% 10%, rgba(217,164,65,.14), transparent 45%),
+                radial-gradient(circle at 85% 90%, rgba(47,74,52,.12), transparent 45%), var(--bg);
+  }
+  .center-card{background:var(--paper); border-radius:20px; box-shadow:var(--shadow); padding:36px 30px; max-width:420px; width:100%; text-align:center; border-top:6px solid var(--leaf);}
+  .login-mark{width:56px;height:56px;border-radius:50%; background:conic-gradient(from 45deg, var(--leaf), var(--turmeric), var(--leaf)); margin:0 auto 18px; display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Space Grotesk'; font-weight:700; font-size:20px;}
+  .center-card h1{font-size:22px; margin:0 0 4px;}
+  .center-card p{color:var(--ink-soft); font-size:14px; margin:0 0 26px;}
+  #gsiBtn{display:flex; justify-content:center;}
+  .errtext{color:var(--danger); font-size:13px; margin-top:14px; min-height:16px;}
+
+  .sppg-list{display:flex; flex-direction:column; gap:8px; text-align:left; margin-bottom:6px;}
+  .sppg-option{border:1px solid var(--line); border-radius:12px; padding:12px 14px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:#FBFBF8;}
+  .sppg-option:hover{border-color:var(--turmeric); background:#FFF9EE;}
+  .sppg-option .nm{font-weight:600; font-size:14px;}
+  .sppg-option .rl{font-size:11px; color:var(--ink-soft); text-transform:capitalize;}
+
+  /* ===== App shell ===== */
+  #app{display:none; min-height:100vh; flex-direction:column;}
+  header.topbar{background:var(--leaf); color:#fff; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:20; flex-wrap:wrap; gap:8px;}
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand-mark{width:30px;height:30px;border-radius:8px;background:var(--turmeric); display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk';font-weight:700;color:var(--leaf-dark);font-size:14px;}
+  .brand-text .name{font-family:'Space Grotesk';font-weight:600;font-size:15px;line-height:1.1;}
+  .brand-text .sub{font-size:11px;opacity:.75;}
+  .userchip{display:flex;align-items:center;gap:8px;font-size:12px; flex-wrap:wrap;}
+  .role-badge{background:rgba(255,255,255,.18); padding:3px 9px; border-radius:20px; font-size:11px; text-transform:capitalize;}
+  .switch-btn,#logoutBtn{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;}
+
+  nav.tabs{display:flex; gap:2px; background:var(--leaf-dark); overflow-x:auto; padding:0 10px; position:sticky; top:56px; z-index:19;}
+  nav.tabs button{background:transparent; border:none; color:rgba(255,255,255,.65); padding:12px 14px; font-size:13px; font-weight:600; cursor:pointer; border-bottom:3px solid transparent; white-space:nowrap;}
+  nav.tabs button.active{color:#fff; border-bottom-color:var(--turmeric);}
+
+  main{flex:1; padding:18px; max-width:980px; margin:0 auto; width:100%;}
+  .view{display:none;} .view.active{display:block;}
+
+  .card{background:var(--paper); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px; margin-bottom:16px; border:1px solid var(--line);}
+  .card h2{font-size:16px; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+  .card h2 .tag{font-size:10px; background:var(--turmeric); color:var(--leaf-dark); padding:2px 7px; border-radius:6px; font-family:'JetBrains Mono';}
+
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:end;}
+  .field{display:flex; flex-direction:column; gap:5px; flex:1; min-width:130px;}
+  .field label{font-size:11px; color:var(--ink-soft); font-weight:600; text-transform:uppercase; letter-spacing:.03em;}
+  input,select{border:1px solid var(--line); border-radius:9px; padding:9px 10px; font-size:14px; background:#FBFBF8; color:var(--ink); font-family:inherit;}
+  input:focus,select:focus{outline:2px solid var(--turmeric); outline-offset:1px; border-color:var(--turmeric);}
+  input:disabled{background:#F0F1EC; color:var(--ink-soft);}
+
+  .btn{border:none; border-radius:9px; padding:10px 16px; font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px;}
+  .btn-primary{background:var(--leaf); color:#fff;} .btn-primary:hover{background:var(--leaf-dark);}
+  .btn-accent{background:var(--turmeric); color:var(--leaf-dark);} .btn-accent:hover{background:var(--turmeric-dark); color:#fff;}
+  .btn-ghost{background:transparent; border:1px solid var(--line); color:var(--ink);}
+  .btn-sm{padding:6px 10px; font-size:12px; border-radius:7px;}
+
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  thead th{text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); border-bottom:2px solid var(--line); padding:8px 8px;}
+  tbody td{padding:9px 8px; border-bottom:1px dashed var(--line); vertical-align:middle;}
+  tbody tr:hover{background:#FAFAF5;}
+  .num{font-family:'JetBrains Mono'; font-variant-numeric:tabular-nums;}
+  .right{text-align:right;}
+
+  .status-pill{padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; display:inline-block;}
+  .status-wait{background:#FBEFD9; color:var(--wait);}
+  .status-filled{background:#E4F0E6; color:var(--ok);}
+  .status-other{background:#F0F1EC; color:var(--ink-soft);}
+
+  .price-input{width:110px;}
+  .table-wrap{overflow-x:auto; border-radius:10px;}
+  .empty{padding:30px; text-align:center; color:var(--ink-soft); font-size:13px;}
+
+  .summary-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-top:8px;}
+  .summary-item{background:#F6F7F1; border-radius:10px; padding:12px; border:1px solid var(--line);}
+  .summary-item .label{font-size:10px; text-transform:uppercase; color:var(--ink-soft); letter-spacing:.03em;}
+  .summary-item .value{font-family:'JetBrains Mono'; font-weight:600; font-size:16px; margin-top:3px;}
+  .summary-item.pos .value{color:var(--ok);} .summary-item.neg .value{color:var(--danger);}
+
+  .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--leaf-dark); color:#fff; padding:11px 18px; border-radius:10px; font-size:13px; box-shadow:var(--shadow); z-index:99; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(-6px);}
+  .toast.err{background:var(--danger);}
+
+  .item-row-form{border:1px dashed var(--line); border-radius:10px; padding:10px; margin-bottom:8px; background:#FBFBF8;}
+
+  @media (max-width:640px){
+    main{padding:12px;} .card{padding:14px;}
+    thead{display:none;}
+    tbody tr{display:block; border-bottom:2px solid var(--line); padding:8px 0;}
+    tbody td{display:flex; justify-content:space-between; border-bottom:none; padding:5px 4px;}
+    tbody td::before{content:attr(data-label); font-size:10px; text-transform:uppercase; color:var(--ink-soft); font-weight:600;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div class="center-screen" id="loginScreen">
+  <div class="center-card">
+    <div class="login-mark">SD</div>
+    <h1>Pengadaan Bahan Baku SPPG</h1>
+    <p>Masuk dengan akun Google terdaftar</p>
+    <div id="gsiBtn"></div>
+    <div class="errtext" id="loginError"></div>
+  </div>
+</div>
+
+<!-- ================= PILIH SPPG ================= -->
+<div class="center-screen" id="pickerScreen" style="display:none;">
+  <div class="center-card">
+    <div class="login-mark">SD</div>
+    <h1>Pilih SPPG</h1>
+    <p id="pickerSub">Anda punya akses ke lebih dari satu dapur</p>
+    <div class="sppg-list" id="sppgOptions"></div>
+    <div class="errtext" id="pickerError"></div>
+  </div>
+</div>
+
+<!-- ================= DAFTAR DAPUR BARU ================= -->
+<div class="center-screen" id="registerScreen" style="display:none;">
+  <div class="center-card" style="max-width:460px;">
+    <div class="login-mark">SD</div>
+    <h1>Daftar Dapur Baru</h1>
+    <p>Email <b id="regEmail"></b> belum terdaftar. Isi data dapur Bapak di bawah ini.</p>
+    <div class="row" style="text-align:left;">
+      <div class="field" style="min-width:100%;"><label>Nama SPPG / Dapur</label><input type="text" id="regNamaSppg" placeholder="mis. SPPG Dapur Melati"></div>
+      <div class="field" style="min-width:100%;"><label>Nama Admin</label><input type="text" id="regNamaAdmin" placeholder="Nama Bapak/Ibu"></div>
+      <div class="field" style="min-width:100%;"><label>Link Google Sheet Dapur</label><input type="text" id="regLink" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
+    </div>
+    <div style="margin-top:14px;"><button class="btn btn-primary" id="submitRegisterBtn" style="width:100%; justify-content:center;">Daftarkan</button></div>
+    <div class="errtext" id="registerError"></div>
+    <div id="registerSuccess" style="display:none; text-align:left; font-size:13px; background:#F6F7F1; border-radius:10px; padding:12px; margin-top:14px; line-height:1.5;"></div>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">SD</div>
+      <div class="brand-text">
+        <div class="name">Pengadaan Bahan Baku SPPG</div>
+        <div class="sub" id="sppgName">-</div>
+      </div>
+    </div>
+    <div class="userchip">
+      <span id="userNama">-</span>
+      <span class="role-badge" id="userRole">-</span>
+      <button class="switch-btn" id="switchSppgBtn">Ganti SPPG</button>
+      <button id="logoutBtn">Keluar</button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs"></nav>
+
+  <main>
+    <!-- ============ PM VIEW ============ -->
+    <section class="view" id="view-pm">
+      <div class="card" id="pmFormCard" style="display:none;">
+        <h2>Buat / Edit PM <span class="tag">Perkiraan Makan</span></h2>
+        <div class="row">
+          <div class="field"><label>Mulai</label><input type="date" id="pmMulai"></div>
+          <div class="field"><label>Sampai</label><input type="date" id="pmSampai"></div>
+          <div class="field"><label>Kuota Belanja (Rp)</label><input type="number" id="pmKuota" placeholder="0"></div>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <div class="field"><label>Kecil — Sen</label><input type="number" id="pk_sen"></div>
+          <div class="field"><label>Kecil — Sel</label><input type="number" id="pk_sel"></div>
+          <div class="field"><label>Kecil — Rab</label><input type="number" id="pk_rab"></div>
+          <div class="field"><label>Kecil — Kam</label><input type="number" id="pk_kam"></div>
+          <div class="field"><label>Kecil — Jum</label><input type="number" id="pk_jum"></div>
+          <div class="field"><label>Kecil — Sab</label><input type="number" id="pk_sab"></div>
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <div class="field"><label>Besar — Sen</label><input type="number" id="pb_sen"></div>
+          <div class="field"><label>Besar — Sel</label><input type="number" id="pb_sel"></div>
+          <div class="field"><label>Besar — Rab</label><input type="number" id="pb_rab"></div>
+          <div class="field"><label>Besar — Kam</label><input type="number" id="pb_kam"></div>
+          <div class="field"><label>Besar — Jum</label><input type="number" id="pb_jum"></div>
+          <div class="field"><label>Besar — Sab</label><input type="number" id="pb_sab"></div>
+        </div>
+        <div style="margin-top:14px;"><button class="btn btn-primary" id="savePmBtn">Simpan PM</button></div>
+      </div>
+
+      <div class="card">
+        <h2>Daftar PM</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>ID PM</th><th>Periode</th><th class="right">Kuota</th><th class="right">Realisasi</th><th class="right">Selisih</th></tr></thead>
+          <tbody id="pmTableBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ============ PO VIEW ============ -->
+    <section class="view" id="view-po">
+      <div class="card" id="poFormCard" style="display:none;">
+        <h2>Buat PO Baru <span class="tag">Item &amp; Qty</span></h2>
+        <div class="field" style="max-width:260px;margin-bottom:10px;"><label>Untuk PM</label><select id="poFormPm"></select></div>
+        <div id="poFormRows"></div>
+        <button class="btn btn-ghost btn-sm" id="addPoRowBtn" type="button">+ Tambah baris item</button>
+        <div style="margin-top:14px;"><button class="btn btn-primary" id="submitPoBtn">Simpan PO</button></div>
+      </div>
+
+      <div class="card">
+        <h2>Daftar PO</h2>
+        <div class="row" style="margin-bottom:12px;">
+          <div class="field"><label>Dari</label><input type="date" id="poFrom"></div>
+          <div class="field"><label>Sampai</label><input type="date" id="poTo"></div>
+          <div class="field" style="flex:0;"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" id="poFilterBtn">Terapkan</button></div>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>Tanggal</th><th>Item</th><th class="right">Qty</th><th>Unit</th><th class="right">Harga Satuan</th><th class="right">Total Belanja</th><th>Status</th></tr></thead>
+          <tbody id="poTableBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ============ LAPORAN VIEW ============ -->
+    <section class="view" id="view-laporan">
+      <div class="card">
+        <h2>Laporan Belanja</h2>
+        <div class="row" style="margin-bottom:6px;">
+          <div class="field"><label>Dari</label><input type="date" id="lapFrom"></div>
+          <div class="field"><label>Sampai</label><input type="date" id="lapTo"></div>
+          <div class="field" style="flex:0;"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" id="lapFilterBtn">Terapkan</button></div>
+        </div>
+        <div class="summary-grid" id="lapSummary"></div>
+      </div>
+      <div class="card">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Tanggal</th><th>Item</th><th class="right">Qty</th><th class="right">Total Belanja</th><th class="right">Modal</th><th class="right">Margin</th></tr></thead>
+          <tbody id="lapTableBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ============ SUPERADMIN: PERSETUJUAN SPPG ============ -->
+    <section class="view" id="view-approval">
+      <div class="card">
+        <h2>Persetujuan Pendaftaran Dapur Baru</h2>
+        <p style="font-size:13px; color:var(--ink-soft); margin-top:-6px;">
+          Pastikan admin dapur sudah men-share spreadsheet-nya (akses Editor) ke email Admin Pusat sebelum di-approve.
+        </p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Kode</th><th>Nama SPPG</th><th>Spreadsheet ID</th><th></th></tr></thead>
+          <tbody id="pendingSppgBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ============ ADMIN: USERS ============ -->
+    <section class="view" id="view-users">
+      <div class="card">
+        <h2>Kelola User <span class="tag" id="usersTag">SPPG Aktif</span></h2>
+        <div class="row item-row-form">
+          <div class="field"><label>Email Google</label><input type="email" id="newUserEmail"></div>
+          <div class="field"><label>Nama</label><input type="text" id="newUserNama"></div>
+          <div class="field">
+            <label>Role</label>
+            <select id="newUserRole">
+              <option value="admin">admin (1 SPPG)</option>
+              <option value="keuangan">keuangan</option>
+              <option value="suplier">suplier</option>
+              <option value="dapur">dapur</option>
+            </select>
+          </div>
+          <div class="field"><label>SPPG</label><select id="newUserSppg"></select></div>
+          <div class="field" style="flex:0;"><label>&nbsp;</label><button class="btn btn-primary" id="addUserBtn">Tambah</button></div>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Email</th><th>Nama</th><th>Role</th><th>SPPG</th><th>Aktif</th><th></th></tr></thead>
+          <tbody id="usersTableBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================================
+   KONFIGURASI — WAJIB DIISI sebelum deploy (dari SPREADSHEET HUB):
+   ===================================================================== */
+const API_URL = 'https://script.google.com/macros/s/AKfycbyJSB_YBpyC8Za5psrSkuP5xJlgjb0TobMqjECqBLvhHbCqFz6PRwBRfDsmoZU2Qkmvnw/exec';
+const GOOGLE_CLIENT_ID = '437595495608-96f8k2fmdop70jub38ga46f77rov0cjt.apps.googleusercontent.com';
+
+/* ===================================================================== */
+
+let state = { email:null, nama:null, role:null, sppgId:null, sppgNama:null, options:[] };
+const HARI = ['sen','sel','rab','kam','jum','sab'];
+const HARI_LABEL = {sen:'Senin',sel:'Selasa',rab:'Rabu',kam:'Kamis',jum:'Jumat',sab:'Sabtu'};
+
+function fmtRupiah(n){ n = Number(n)||0; return 'Rp' + n.toLocaleString('id-ID'); }
+function fmtDate(d){ if(!d) return '-'; const dt = new Date(d); if(isNaN(dt)) return d; return dt.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'2-digit'}); }
+function toast(msg, isErr){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (isErr?' err':'');
+  setTimeout(()=> t.className='toast', 2600);
+}
+
+async function api(action, payload){
+  payload = payload || {};
+  payload.action = action;
+  payload.email = state.email;
+  payload.sppgId = state.sppgId;
+  const res = await fetch(API_URL, { method:'POST', body: JSON.stringify(payload) });
+  const json = await res.json();
+  if(!json.ok) throw new Error(json.error || 'Terjadi kesalahan');
+  return json.data;
+}
+
+/* ---------------- LOGIN ---------------- */
+window.onload = () => {
+  if(!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.indexOf('PASTE') === 0){
+    document.getElementById('loginError').textContent = 'Aplikasi belum dikonfigurasi (Client ID kosong). Hubungi admin.';
+    return;
+  }
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogleCredential });
+  google.accounts.id.renderButton(document.getElementById('gsiBtn'), { theme:'outline', size:'large', shape:'pill', text:'signin_with' });
+};
+
+async function onGoogleCredential(response){
+  try{
+    state.idToken = response.credential;
+    const res = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'login', idToken: state.idToken }) });
+    const json = await res.json();
+    if(!json.ok) throw new Error(json.error);
+    state.email = json.data.email; state.nama = json.data.nama; state.options = json.data.options;
+
+    if(json.data.newUser){
+      showRegister();
+    } else if(state.options.length === 1){
+      selectSppg(state.options[0]);
+    } else {
+      showPicker();
+    }
+  } catch(err){
+    document.getElementById('loginError').textContent = err.message;
+  }
+}
+
+function showRegister(){
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('registerScreen').style.display = 'flex';
+  document.getElementById('regEmail').textContent = state.email;
+}
+
+document.getElementById('submitRegisterBtn').addEventListener('click', async () => {
+  const namaSppg = document.getElementById('regNamaSppg').value.trim();
+  const namaAdmin = document.getElementById('regNamaAdmin').value.trim();
+  const link = document.getElementById('regLink').value.trim();
+  document.getElementById('registerError').textContent = '';
+  if(!namaSppg || !link){ document.getElementById('registerError').textContent = 'Nama SPPG dan link spreadsheet wajib diisi'; return; }
+  try{
+    const res = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'registerSppg', idToken: state.idToken, namaSppg, namaAdmin, spreadsheetLink: link }) });
+    const json = await res.json();
+    if(!json.ok) throw new Error(json.error);
+    document.getElementById('submitRegisterBtn').style.display = 'none';
+    const box = document.getElementById('registerSuccess');
+    box.style.display = 'block';
+    box.innerHTML = `Pendaftaran terkirim untuk kode SPPG <b>${json.data.sppgId}</b>.<br><br>
+      Langkah selanjutnya: <b>share spreadsheet dapur Bapak</b> (akses Editor) ke email:<br>
+      <span class="mono">${json.data.adminPusatEmail}</span><br><br>
+      Setelah itu, tunggu persetujuan dari Admin Pusat. Anda bisa mencoba login lagi nanti.`;
+  } catch(e){
+    document.getElementById('registerError').textContent = e.message;
+  }
+});
+
+function showPicker(){
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('pickerScreen').style.display = 'flex';
+  const wrap = document.getElementById('sppgOptions'); wrap.innerHTML = '';
+  state.options.forEach(o => {
+    const div = document.createElement('div');
+    div.className = 'sppg-option';
+    div.innerHTML = `<span class="nm">${o.sppgNama}</span><span class="rl">${o.role}</span>`;
+    div.addEventListener('click', () => selectSppg(o));
+    wrap.appendChild(div);
+  });
+}
+
+function selectSppg(o){
+  state.role = o.role; state.sppgId = o.sppgId; state.sppgNama = o.sppgNama;
+  boot();
+}
+
+document.getElementById('switchSppgBtn').addEventListener('click', () => {
+  document.getElementById('app').style.display = 'none';
+  if(state.options.length > 1){ showPicker(); }
+  else { document.getElementById('loginScreen').style.display = 'flex'; }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  state = { email:null, nama:null, role:null, sppgId:null, sppgNama:null, options:[] };
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('pickerScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+});
+
+/* ---------------- BOOT / NAV ---------------- */
+async function boot(){
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('pickerScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('userNama').textContent = state.nama;
+  document.getElementById('userRole').textContent = state.role;
+  document.getElementById('sppgName').textContent = state.sppgNama;
+  document.getElementById('switchSppgBtn').style.display = state.options.length > 1 ? 'inline-flex' : 'none';
+
+  buildTabs();
+  showView(document.querySelector('#tabs button').dataset.view);
+}
+
+const TAB_DEFS = [
+  { id:'approval', label:'Persetujuan SPPG', roles:['superadmin'] },
+  { id:'pm', label:'PM', roles:['admin','keuangan','suplier','dapur'] },
+  { id:'po', label:'PO', roles:['admin','keuangan','suplier','dapur'] },
+  { id:'laporan', label:'Laporan', roles:['admin','keuangan','suplier'] },
+  { id:'users', label:'Kelola User', roles:['admin','superadmin'] }
+];
+
+function buildTabs(){
+  const nav = document.getElementById('tabs'); nav.innerHTML = '';
+  TAB_DEFS.filter(t => t.roles.includes(state.role)).forEach((t,i) => {
+    const b = document.createElement('button');
+    b.textContent = t.label; b.dataset.view = t.id;
+    if(i===0) b.classList.add('active');
+    b.addEventListener('click', () => showView(t.id));
+    nav.appendChild(b);
+  });
+}
+
+function showView(id){
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-'+id).classList.add('active');
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.view===id));
+  if(id==='pm') loadPM();
+  if(id==='po') loadPO();
+  if(id==='laporan') loadLaporan();
+  if(id==='users') loadUsers();
+  if(id==='approval') loadPendingSppg();
+}
+
+/* ---------------- SUPERADMIN: PERSETUJUAN SPPG ---------------- */
+async function loadPendingSppg(){
+  let list = [];
+  try{ list = await api('getPendingSppg', {}); } catch(e){ toast(e.message, true); return; }
+  const tb = document.getElementById('pendingSppgBody'); tb.innerHTML = '';
+  if(!list.length){ tb.innerHTML = '<tr><td colspan="4" class="empty">Tidak ada pendaftaran menunggu persetujuan</td></tr>'; return; }
+  list.forEach(s => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td data-label="Kode" class="mono">${s.ID_SPPG}</td>
+      <td data-label="Nama SPPG">${s.Nama_SPPG}</td>
+      <td data-label="Spreadsheet ID" class="mono" style="font-size:11px;">${s.Spreadsheet_ID}</td>
+      <td data-label=""><button class="btn btn-accent btn-sm approve-btn">Setujui</button> <button class="btn btn-ghost btn-sm reject-btn">Tolak</button></td>
+    `;
+    tr.querySelector('.approve-btn').addEventListener('click', async () => {
+      try{ await api('approveSppg', { sppgId: s.ID_SPPG, approve: true }); toast('SPPG disetujui'); loadPendingSppg(); }
+      catch(e){ toast(e.message, true); }
+    });
+    tr.querySelector('.reject-btn').addEventListener('click', async () => {
+      try{ await api('approveSppg', { sppgId: s.ID_SPPG, approve: false }); toast('Pendaftaran ditolak'); loadPendingSppg(); }
+      catch(e){ toast(e.message, true); }
+    });
+    tb.appendChild(tr);
+  });
+}
+
+/* ---------------- PM ---------------- */
+async function loadPM(){
+  const canEdit = ['admin','keuangan'].includes(state.role);
+  document.getElementById('pmFormCard').style.display = canEdit ? 'block' : 'none';
+  let list = [];
+  try{ list = await api('getPM', {}); }catch(e){ toast(e.message, true); }
+  const tb = document.getElementById('pmTableBody'); tb.innerHTML = '';
+  if(!list.length){ tb.innerHTML = '<tr><td colspan="5" class="empty">Belum ada data PM</td></tr>'; }
+  list.forEach(pm => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td data-label="ID PM" class="mono">${pm['ID PM']}</td>
+      <td data-label="Periode">${fmtDate(pm['Mulai'])} – ${fmtDate(pm['Sampai'])}</td>
+      <td data-label="Kuota" class="right num">${fmtRupiah(pm['Kuota Belanja'])}</td>
+      <td data-label="Realisasi" class="right num">${fmtRupiah(pm['Realisasi Belanja'])}</td>
+      <td data-label="Selisih" class="right num" style="color:${pm['Selisih']<0?'var(--danger)':'var(--ok)'}">${fmtRupiah(pm['Selisih'])}</td>
+    `;
+    tb.appendChild(tr);
+  });
+  loadPmDropdownForPO(list);
+}
+
+document.getElementById('savePmBtn').addEventListener('click', async () => {
+  const data = {
+    'Mulai': document.getElementById('pmMulai').value,
+    'Sampai': document.getElementById('pmSampai').value,
+    'Kuota Belanja': Number(document.getElementById('pmKuota').value)||0,
+  };
+  HARI.forEach(h => {
+    data['PM kecil '+HARI_LABEL[h]] = Number(document.getElementById('pk_'+h).value)||0;
+    data['PM Besar '+HARI_LABEL[h]] = Number(document.getElementById('pb_'+h).value)||0;
+  });
+  if(!data['Mulai'] || !data['Sampai']){ toast('Isi tanggal Mulai & Sampai', true); return; }
+  try{ await api('createPM', {data}); toast('PM tersimpan'); loadPM(); }
+  catch(e){ toast(e.message, true); }
+});
+
+/* ---------------- PO ---------------- */
+let itemMasterCache = [];
+
+function loadPmDropdownForPO(list){
+  const sel = document.getElementById('poFormPm');
+  sel.innerHTML = list.map(p => `<option value="${p['ID PM']}">${p['ID PM']} (${fmtDate(p['Mulai'])}–${fmtDate(p['Sampai'])})</option>`).join('');
+}
+
+async function loadPO(){
+  const canCreate = ['admin','keuangan'].includes(state.role);
+  document.getElementById('poFormCard').style.display = canCreate ? 'block' : 'none';
+  if(canCreate && !document.getElementById('poFormRows').children.length) addPoRow();
+  itemMasterCache = [];
+  try{ itemMasterCache = await api('getItems', {}); }catch(e){}
+
+  const from = document.getElementById('poFrom').value;
+  const to = document.getElementById('poTo').value;
+  let list = [];
+  try{ list = await api('getPO', { from, to }); }catch(e){ toast(e.message, true); return; }
+  renderPOTable(list);
+}
+document.getElementById('poFilterBtn').addEventListener('click', loadPO);
+
+function renderPOTable(list){
+  const tb = document.getElementById('poTableBody'); tb.innerHTML = '';
+  if(!list.length){ tb.innerHTML = '<tr><td colspan="8" class="empty">Belum ada PO</td></tr>'; return; }
+  const canFillPrice = ['admin','suplier'].includes(state.role);
+  list.sort((a,b) => new Date(b['Tanggal']) - new Date(a['Tanggal']));
+  list.forEach(po => {
+    const tr = document.createElement('tr');
+    const statusClass = po['Status']==='menunggu harga' ? 'status-wait' : (po['Status']==='harga terisi' ? 'status-filled' : 'status-other');
+    const priceCell = canFillPrice
+      ? `<input class="price-input mono" type="number" value="${po['Unit Price']||''}" placeholder="isi harga" data-id="${po['ID']}">`
+      : `<span class="num">${po['Unit Price'] ? fmtRupiah(po['Unit Price']) : '-'}</span>`;
+    tr.innerHTML = `
+      <td data-label="ID" class="mono">${po['ID']}</td>
+      <td data-label="Tanggal">${fmtDate(po['Tanggal'])}</td>
+      <td data-label="Item">${po['Item']}</td>
+      <td data-label="Qty" class="right num">${po['Qty']}</td>
+      <td data-label="Unit">${po['Unit']}</td>
+      <td data-label="Harga Satuan" class="right">${priceCell}</td>
+      <td data-label="Total Belanja" class="right num">${po['Total Belanja'] ? fmtRupiah(po['Total Belanja']) : '-'}</td>
+      <td data-label="Status"><span class="status-pill ${statusClass}">${po['Status']}</span></td>
+    `;
+    tb.appendChild(tr);
+  });
+  if(canFillPrice){
+    tb.querySelectorAll('.price-input').forEach(inp => {
+      inp.addEventListener('change', async () => {
+        try{ await api('updatePOPrice', { id: inp.dataset.id, unitPrice: Number(inp.value) }); toast('Harga tersimpan'); loadPO(); }
+        catch(e){ toast(e.message, true); }
+      });
+    });
+  }
+}
+
+function addPoRow(){
+  const wrap = document.getElementById('poFormRows');
+  const div = document.createElement('div');
+  div.className = 'item-row-form row';
+  div.innerHTML = `
+    <div class="field"><label>Tanggal</label><input type="date" class="po-tanggal"></div>
+    <div class="field" style="flex:2;"><label>Item</label><input type="text" list="itemDatalist" class="po-item" placeholder="nama item"></div>
+    <div class="field"><label>Qty</label><input type="number" class="po-qty"></div>
+    <div class="field"><label>Unit</label><input type="text" class="po-unit" placeholder="kg / pcs / dus"></div>
+    <div class="field" style="flex:0;"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" type="button" onclick="this.closest('.item-row-form').remove()">Hapus</button></div>
+  `;
+  wrap.appendChild(div);
+  let dl = document.getElementById('itemDatalist');
+  if(!dl){ dl = document.createElement('datalist'); dl.id = 'itemDatalist'; document.body.appendChild(dl); }
+  dl.innerHTML = itemMasterCache.map(it => `<option value="${it['Item']}">`).join('');
+}
+document.getElementById('addPoRowBtn').addEventListener('click', addPoRow);
+
+document.getElementById('submitPoBtn').addEventListener('click', async () => {
+  const rows = [];
+  document.querySelectorAll('#poFormRows .item-row-form').forEach(r => {
+    const item = r.querySelector('.po-item').value.trim();
+    if(!item) return;
+    rows.push({
+      Tanggal: r.querySelector('.po-tanggal').value,
+      Item: item,
+      Qty: Number(r.querySelector('.po-qty').value) || 0,
+      Unit: r.querySelector('.po-unit').value.trim(),
+      Kategori: 'bahan baku'
+    });
+  });
+  if(!rows.length){ toast('Isi minimal satu baris item', true); return; }
+  const pmId = document.getElementById('poFormPm').value;
+  try{
+    await api('createPO', { rows, pmId });
+    toast('PO tersimpan');
+    document.getElementById('poFormRows').innerHTML = '';
+    addPoRow();
+    loadPO();
+  } catch(e){ toast(e.message, true); }
+});
+
+/* ---------------- LAPORAN ---------------- */
+async function loadLaporan(){
+  const from = document.getElementById('lapFrom').value;
+  const to = document.getElementById('lapTo').value;
+  let data;
+  try{ data = await api('getLaporan', { from, to }); } catch(e){ toast(e.message, true); return; }
+  const s = data.summary;
+  document.getElementById('lapSummary').innerHTML = `
+    <div class="summary-item"><div class="label">Total Belanja</div><div class="value">${fmtRupiah(s.totalBelanja)}</div></div>
+    <div class="summary-item"><div class="label">Total Modal</div><div class="value">${fmtRupiah(s.totalModal)}</div></div>
+    <div class="summary-item ${s.margin>=0?'pos':'neg'}"><div class="label">Margin</div><div class="value">${fmtRupiah(s.margin)}</div></div>
+    <div class="summary-item"><div class="label">% Margin</div><div class="value">${s.pctMargin.toFixed(1)}%</div></div>
+  `;
+  const tb = document.getElementById('lapTableBody'); tb.innerHTML = '';
+  if(!data.rows.length){ tb.innerHTML = '<tr><td colspan="6" class="empty">Tidak ada data pada rentang ini</td></tr>'; return; }
+  data.rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td data-label="Tanggal">${fmtDate(r['Tanggal'])}</td>
+      <td data-label="Item">${r['Item']}</td>
+      <td data-label="Qty" class="right num">${r['Qty']}</td>
+      <td data-label="Total Belanja" class="right num">${fmtRupiah(r['Total Belanja'])}</td>
+      <td data-label="Modal" class="right num">${fmtRupiah(r['Total Modal'])}</td>
+      <td data-label="Margin" class="right num">${fmtRupiah(r['Margin'])}</td>
+    `;
+    tb.appendChild(tr);
+  });
+}
+document.getElementById('lapFilterBtn').addEventListener('click', loadLaporan);
+
+/* ---------------- USERS (admin: 1 SPPG, superadmin: semua) ---------------- */
+async function loadUsers(){
+  const isSuperadmin = state.role === 'superadmin';
+  const realSppgOptions = state.options.filter(o => o.sppgId); // buang opsi "Admin Pusat" (sppgId null)
+  const sppgSel = document.getElementById('newUserSppg');
+
+  if(isSuperadmin){
+    document.getElementById('usersTag').textContent = 'Semua SPPG';
+    sppgSel.innerHTML = realSppgOptions.map(o => `<option value="${o.sppgId}">${o.sppgNama}</option>`).join('');
+    sppgSel.disabled = false;
+  } else {
+    document.getElementById('usersTag').textContent = state.sppgNama;
+    sppgSel.innerHTML = `<option value="${state.sppgId}">${state.sppgNama}</option>`;
+    sppgSel.disabled = true;
+  }
+
+  let list = [];
+  try{ list = await api('getUsers', {}); } catch(e){ toast(e.message, true); return; }
+  const tb = document.getElementById('usersTableBody'); tb.innerHTML = '';
+  list.forEach(u => {
+    const sppgLabel = realSppgOptions.find(o=>o.sppgId===u.SPPG_ID)?.sppgNama || u.SPPG_ID || '-';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td data-label="Email">${u.Email}</td>
+      <td data-label="Nama">${u.Nama}</td>
+      <td data-label="Role">${u.Role}</td>
+      <td data-label="SPPG">${sppgLabel}</td>
+      <td data-label="Aktif">${u.Aktif}</td>
+      <td data-label=""><button class="btn btn-ghost btn-sm toggle-active">${String(u.Aktif).toUpperCase()==='YA'?'Nonaktifkan':'Aktifkan'}</button></td>
+    `;
+    tr.querySelector('.toggle-active').addEventListener('click', async () => {
+      const newAktif = String(u.Aktif).toUpperCase()==='YA' ? 'TIDAK' : 'YA';
+      try{ await api('saveUser', { data:{ Email:u.Email, Nama:u.Nama, Role:u.Role, SPPG_ID:u.SPPG_ID, Aktif:newAktif } }); loadUsers(); }
+      catch(e){ toast(e.message, true); }
+    });
+    tb.appendChild(tr);
+  });
+}
+document.getElementById('addUserBtn').addEventListener('click', async () => {
+  const isSuperadmin = state.role === 'superadmin';
+  const data = {
+    Email: document.getElementById('newUserEmail').value.trim(),
+    Nama: document.getElementById('newUserNama').value.trim(),
+    Role: document.getElementById('newUserRole').value,
+    SPPG_ID: isSuperadmin ? document.getElementById('newUserSppg').value : state.sppgId,
+    Aktif: 'YA'
+  };
+  if(!data.Email){ toast('Isi email', true); return; }
+  try{ await api('saveUser', {data}); toast('User tersimpan'); document.getElementById('newUserEmail').value=''; document.getElementById('newUserNama').value=''; loadUsers(); }
+  catch(e){ toast(e.message, true); }
+});
+</script>
+</body>
+</html>
