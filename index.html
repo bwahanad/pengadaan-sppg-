@@ -140,7 +140,7 @@
 
 <!-- ================= DAFTAR DAPUR BARU ================= -->
 <div class="center-screen" id="registerScreen" style="display:none;">
-  <div class="center-card" style="max-width:460px;">
+  <div class="center-card" style="max-width:520px;">
     <div class="login-mark">SD</div>
     <h1>Daftar Dapur Baru</h1>
     <p>Email <b id="regEmail"></b> belum terdaftar. Isi data dapur Bapak di bawah ini.</p>
@@ -148,6 +148,27 @@
       <div class="field" style="min-width:100%;"><label>Nama SPPG / Dapur</label><input type="text" id="regNamaSppg" placeholder="mis. SPPG Dapur Melati"></div>
       <div class="field" style="min-width:100%;"><label>Nama Admin</label><input type="text" id="regNamaAdmin" placeholder="Nama Bapak/Ibu"></div>
       <div class="field" style="min-width:100%;"><label>Link Google Sheet Dapur</label><input type="text" id="regLink" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
+    </div>
+
+    <div style="text-align:left; margin-top:16px; padding-top:14px; border-top:1px dashed var(--line);">
+      <p style="font-size:12px; color:var(--ink-soft); margin:0 0 10px;">
+        Opsional — bisa diisi sekarang atau ditambahkan nanti lewat "Kelola User" setelah disetujui.
+      </p>
+      <div class="row" style="margin-bottom:8px;">
+        <div class="field" style="min-width:100%;"><label>Kategori 1 — Keuangan <span style="font-weight:400; text-transform:none;">(input PM, PO, Item master)</span></label></div>
+        <div class="field"><input type="text" id="regKeuanganNama" placeholder="Nama"></div>
+        <div class="field"><input type="email" id="regKeuanganEmail" placeholder="Email Google"></div>
+      </div>
+      <div class="row" style="margin-bottom:8px;">
+        <div class="field" style="min-width:100%;"><label>Kategori 2 — Suplier <span style="font-weight:400; text-transform:none;">(isi harga satuan saja)</span></label></div>
+        <div class="field"><input type="text" id="regSuplierNama" placeholder="Nama"></div>
+        <div class="field"><input type="email" id="regSuplierEmail" placeholder="Email Google"></div>
+      </div>
+      <div class="row">
+        <div class="field" style="min-width:100%;"><label>Kategori 3 — Dapur <span style="font-weight:400; text-transform:none;">(lihat PM &amp; PO saja, bisa lebih dari 1 orang)</span></label></div>
+      </div>
+      <div id="regDapurRows"></div>
+      <button class="btn btn-ghost btn-sm" id="addDapurRowBtn" type="button" style="margin-top:2px;">+ Tambah orang</button>
     </div>
     <div style="margin-top:14px;"><button class="btn btn-primary" id="submitRegisterBtn" style="width:100%; justify-content:center;">Daftarkan</button></div>
     <div class="errtext" id="registerError"></div>
@@ -366,7 +387,24 @@ function showRegister(){
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('registerScreen').style.display = 'flex';
   document.getElementById('regEmail').textContent = state.email;
+  document.getElementById('regDapurRows').innerHTML = '';
+  ['Kepala SPPG','Pengawas Gizi','Kepala Masak'].forEach(addDapurRow);
 }
+
+function addDapurRow(jabatanHint){
+  const wrap = document.getElementById('regDapurRows');
+  const div = document.createElement('div');
+  div.className = 'row';
+  div.style.marginBottom = '6px';
+  div.innerHTML = `
+    <div class="field"><input type="text" class="reg-dapur-jabatan" placeholder="${jabatanHint ? 'mis. '+jabatanHint : 'Jabatan (opsional)'}"></div>
+    <div class="field"><input type="text" class="reg-dapur-nama" placeholder="Nama"></div>
+    <div class="field"><input type="email" class="reg-dapur-email" placeholder="Email Google"></div>
+    <div class="field" style="flex:0;"><button class="btn btn-ghost btn-sm" type="button" onclick="this.closest('.row').remove()">✕</button></div>
+  `;
+  wrap.appendChild(div);
+}
+document.getElementById('addDapurRowBtn').addEventListener('click', () => addDapurRow());
 
 document.getElementById('submitRegisterBtn').addEventListener('click', async () => {
   const namaSppg = document.getElementById('regNamaSppg').value.trim();
@@ -374,8 +412,22 @@ document.getElementById('submitRegisterBtn').addEventListener('click', async () 
   const link = document.getElementById('regLink').value.trim();
   document.getElementById('registerError').textContent = '';
   if(!namaSppg || !link){ document.getElementById('registerError').textContent = 'Nama SPPG dan link spreadsheet wajib diisi'; return; }
+
+  const tim = {
+    keuangan: { nama: document.getElementById('regKeuanganNama').value.trim(), email: document.getElementById('regKeuanganEmail').value.trim() },
+    suplier: { nama: document.getElementById('regSuplierNama').value.trim(), email: document.getElementById('regSuplierEmail').value.trim() },
+    dapur: []
+  };
+  document.querySelectorAll('#regDapurRows .row').forEach(r => {
+    const email = r.querySelector('.reg-dapur-email').value.trim();
+    if(!email) return;
+    const jabatan = r.querySelector('.reg-dapur-jabatan').value.trim();
+    const nama = r.querySelector('.reg-dapur-nama').value.trim();
+    tim.dapur.push({ email, nama: jabatan ? `${nama || email} (${jabatan})` : (nama || email) });
+  });
+
   try{
-    const res = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'registerSppg', idToken: state.idToken, namaSppg, namaAdmin, spreadsheetLink: link }) });
+    const res = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'registerSppg', idToken: state.idToken, namaSppg, namaAdmin, spreadsheetLink: link, tim }) });
     const json = await res.json();
     if(!json.ok) throw new Error(json.error);
     document.getElementById('submitRegisterBtn').style.display = 'none';
@@ -384,7 +436,8 @@ document.getElementById('submitRegisterBtn').addEventListener('click', async () 
     box.innerHTML = `Pendaftaran terkirim untuk kode SPPG <b>${json.data.sppgId}</b>.<br><br>
       Langkah selanjutnya: <b>share spreadsheet dapur Bapak</b> (akses Editor) ke email:<br>
       <span class="mono">${json.data.adminPusatEmail}</span><br><br>
-      Setelah itu, tunggu persetujuan dari Admin Pusat. Anda bisa mencoba login lagi nanti.`;
+      Setelah itu, tunggu persetujuan dari Admin Pusat. Tim (Keuangan/Suplier/Dapur) yang tadi diisi
+      akan otomatis aktif bersamaan begitu SPPG disetujui. Anda bisa mencoba login lagi nanti.`;
   } catch(e){
     document.getElementById('registerError').textContent = e.message;
   }
