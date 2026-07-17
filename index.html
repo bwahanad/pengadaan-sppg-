@@ -480,11 +480,11 @@ async function loadPendingSppg(){
       <td data-label=""><button class="btn btn-accent btn-sm approve-btn">Setujui</button> <button class="btn btn-ghost btn-sm reject-btn">Tolak</button></td>
     `;
     tr.querySelector('.approve-btn').addEventListener('click', async () => {
-      try{ await api('approveSppg', { sppgId: s.ID_SPPG, approve: true }); toast('SPPG disetujui'); loadPendingSppg(); }
+      try{ await api('approveSppg', { targetSppgId: s.ID_SPPG, approve: true }); toast('SPPG disetujui'); loadPendingSppg(); }
       catch(e){ toast(e.message, true); }
     });
     tr.querySelector('.reject-btn').addEventListener('click', async () => {
-      try{ await api('approveSppg', { sppgId: s.ID_SPPG, approve: false }); toast('Pendaftaran ditolak'); loadPendingSppg(); }
+      try{ await api('approveSppg', { targetSppgId: s.ID_SPPG, approve: false }); toast('Pendaftaran ditolak'); loadPendingSppg(); }
       catch(e){ toast(e.message, true); }
     });
     tb.appendChild(tr);
