@@ -337,7 +337,7 @@
 
       <div class="card">
         <h2>Daftar Item</h2>
-        <div class="table-wrap"><table>
+        <div class="table-wrap"><table class="compact-table">
           <thead><tr id="itemTableHead"></tr></thead>
           <tbody id="itemTableBody"></tbody>
         </table></div>
@@ -927,6 +927,19 @@ function addPoRow(){
 document.getElementById('addPoRowBtn').addEventListener('click', addPoRow);
 
 /* ---------------- ITEM MASTER ---------------- */
+const GROUP_SORT_ORDER = ['Karbo','Protein Hewani','Protein Nabati','Sayur','Buah','Bumbu','Susu'];
+
+function sortItemsForDisplay(list){
+  return [...list].sort((a,b) => {
+    const ga = GROUP_SORT_ORDER.indexOf(a['Group']);
+    const gb = GROUP_SORT_ORDER.indexOf(b['Group']);
+    const gaIdx = ga === -1 ? GROUP_SORT_ORDER.length : ga;
+    const gbIdx = gb === -1 ? GROUP_SORT_ORDER.length : gb;
+    if(gaIdx !== gbIdx) return gaIdx - gbIdx;
+    return String(a['Item']||'').localeCompare(String(b['Item']||''), 'id', {sensitivity:'base'});
+  });
+}
+
 async function loadItemMaster(){
   const canManageDescriptive = ['admin','keuangan'].includes(state.role);
   const canEditModal = ['admin','suplier'].includes(state.role);
@@ -937,18 +950,19 @@ async function loadItemMaster(){
   let list = [];
   try{ list = await api('getItems', {}); } catch(e){ toast(e.message, true); return; }
   itemMasterCache = list;
+  list = sortItemsForDisplay(list);
 
   const head = document.getElementById('itemTableHead');
-  head.innerHTML = `<th>Item</th><th>Satuan</th><th>Group</th><th>Kategori</th><th class="right">Porsi/Unit</th>
-    ${canSeeModal ? '<th class="right">Modal (Rp)</th>' : ''}
+  head.innerHTML = `<th>Item</th><th>Satuan</th><th>Group</th><th>Kategori</th>
+    ${canSeeModal ? '<th class="right">Unit Price</th>' : ''}
     ${(canManageDescriptive||canDelete) ? '<th></th>' : ''}`;
 
   const tb = document.getElementById('itemTableBody'); tb.innerHTML = '';
-  const colCount = 5 + (canSeeModal?1:0) + ((canManageDescriptive||canDelete)?1:0);
+  const colCount = 4 + (canSeeModal?1:0) + ((canManageDescriptive||canDelete)?1:0);
   if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Belum ada item</td></tr>`; return; }
   list.forEach(it => {
     const tr = document.createElement('tr');
-    const modalCell = canSeeModal ? `<td data-label="Modal" class="right">${canEditModal
+    const modalCell = canSeeModal ? `<td data-label="Unit Price" class="right">${canEditModal
       ? `<input class="price-input mono item-modal-input" type="number" value="${it['Unit Price']||''}" placeholder="modal" data-id="${it['ID']}" data-nama="${it['Item']}">`
       : `<span class="num">${it['Unit Price'] ? fmtRupiah(it['Unit Price']) : '-'}</span>`}</td>` : '';
     const actionCell = (canManageDescriptive||canDelete) ? `<td data-label="">
@@ -956,11 +970,10 @@ async function loadItemMaster(){
       ${canDelete ? `<button class="btn btn-ghost btn-sm delete-item-btn" data-id="${it['ID']}">Hapus</button>` : ''}
     </td>` : '';
     tr.innerHTML = `
-      <td data-label="Item">${it['Item']}</td>
+      <td data-label="Item"><span class="po-item-name">${it['Item']}</span></td>
       <td data-label="Satuan">${it['satuan']||'-'}</td>
       <td data-label="Group">${it['Group']||'-'}</td>
       <td data-label="Kategori">${it['Kategori']||'-'}</td>
-      <td data-label="Porsi/Unit" class="right num">${it['porsi per unit']||'-'}</td>
       ${modalCell}
       ${actionCell}
     `;
