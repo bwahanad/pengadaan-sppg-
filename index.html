@@ -126,7 +126,7 @@
   }
   .confirm-overlay.show{display:flex;}
   .confirm-box{background:var(--paper); border-radius:16px; padding:22px; max-width:340px; width:100%; box-shadow:var(--shadow); text-align:center;}
-  .confirm-box p{font-size:14px; margin:0 0 18px; color:var(--ink);}
+  .confirm-box p{font-size:14px; margin:0 0 18px; color:var(--ink); white-space:pre-line;}
   .confirm-actions{display:flex; gap:10px; justify-content:center;}
   .confirm-actions .btn{flex:1;}
 
@@ -332,7 +332,10 @@
           </div>
           <div class="field"><label>Porsi per Unit</label><input type="number" id="itemPorsi"></div>
         </div>
-        <div style="margin-top:14px;"><button class="btn btn-primary" id="saveItemBtn">Simpan Item</button></div>
+        <div style="margin-top:14px;">
+          <button class="btn btn-primary" id="saveItemBtn">Simpan Item</button>
+          <button class="btn btn-ghost" id="clearItemBtn" type="button">Clear</button>
+        </div>
       </div>
 
       <div class="card">
@@ -420,6 +423,15 @@
   </div>
 </div>
 
+<div class="confirm-overlay" id="alertOverlay">
+  <div class="confirm-box">
+    <p id="alertMessage">-</p>
+    <div class="confirm-actions">
+      <button class="btn btn-primary btn-sm" id="alertOkBtn">OK</button>
+    </div>
+  </div>
+</div>
+
 <div class="confirm-overlay" id="waSendOverlay">
   <div class="confirm-box" style="max-width:360px; text-align:left;">
     <h3 style="margin:0 0 12px; font-size:16px;">Kirim PO ke WA Suplier</h3>
@@ -477,6 +489,21 @@ function showConfirm(message){
     const onNo = () => cleanup(false);
     yesBtn.addEventListener('click', onYes);
     noBtn.addEventListener('click', onNo);
+  });
+}
+
+function showAlert(message){
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('alertOverlay');
+    document.getElementById('alertMessage').textContent = message;
+    overlay.classList.add('show');
+    const okBtn = document.getElementById('alertOkBtn');
+    const onOk = () => {
+      overlay.classList.remove('show');
+      okBtn.removeEventListener('click', onOk);
+      resolve();
+    };
+    okBtn.addEventListener('click', onOk);
   });
 }
 
@@ -995,7 +1022,7 @@ async function loadItemMaster(){
         if(!it) return;
         document.getElementById('itemNama').value = it['Item'] || '';
         document.getElementById('itemSatuan').value = it['satuan'] || '';
-        document.getElementById('itemGroup').value = it['Group'] || '';
+        setItemGroupValue(it['Group'] || '');
         document.getElementById('itemKategori').value = it['Kategori'] || 'bahan baku';
         document.getElementById('itemPorsi').value = it['porsi per unit'] || '';
         document.getElementById('itemFormCard').scrollIntoView({behavior:'smooth'});
@@ -1013,23 +1040,58 @@ async function loadItemMaster(){
   }
 }
 
+/** Set value dropdown Group, cocokkan tanpa peduli huruf besar/kecil dengan opsi yang ada.
+ *  Kalau nilai lama tidak cocok dengan opsi manapun (data lama sebelum jadi dropdown), tambahkan
+ *  sebagai opsi sementara supaya tidak hilang/kosong. */
+function setItemGroupValue(rawValue){
+  const sel = document.getElementById('itemGroup');
+  if(!rawValue){ sel.value = ''; return; }
+  const match = Array.from(sel.options).find(o => o.value.toLowerCase() === rawValue.toLowerCase());
+  if(match){ sel.value = match.value; return; }
+  const opt = document.createElement('option');
+  opt.value = rawValue; opt.textContent = rawValue + ' (belum baku)';
+  sel.appendChild(opt);
+  sel.value = rawValue;
+}
+
+function clearItemForm(){
+  document.getElementById('itemNama').value = '';
+  document.getElementById('itemSatuan').value = '';
+  document.getElementById('itemGroup').value = '';
+  document.getElementById('itemKategori').value = 'bahan baku';
+  document.getElementById('itemPorsi').value = '';
+}
+document.getElementById('clearItemBtn').addEventListener('click', clearItemForm);
+
 document.getElementById('saveItemBtn').addEventListener('click', async () => {
   const nama = document.getElementById('itemNama').value.trim();
-  if(!nama){ toast('Isi nama item', true); return; }
+  const satuan = document.getElementById('itemSatuan').value.trim();
+  const group = document.getElementById('itemGroup').value.trim();
+  const kategori = document.getElementById('itemKategori').value.trim();
+  const porsiRaw = document.getElementById('itemPorsi').value;
+
+  const missing = [];
+  if(!nama) missing.push('Nama Item');
+  if(!satuan) missing.push('Satuan');
+  if(!group) missing.push('Group');
+  if(!kategori) missing.push('Kategori');
+  if(porsiRaw === '') missing.push('Porsi per Unit');
+  if(missing.length){
+    await showAlert('Kolom berikut belum diisi:\n' + missing.join(', '));
+    return;
+  }
+
   const data = {
     Item: nama,
-    satuan: document.getElementById('itemSatuan').value.trim(),
-    Group: document.getElementById('itemGroup').value.trim(),
-    Kategori: document.getElementById('itemKategori').value.trim() || 'bahan baku',
-    'porsi per unit': Number(document.getElementById('itemPorsi').value) || ''
+    satuan: satuan,
+    Group: group,
+    Kategori: kategori,
+    'porsi per unit': Number(porsiRaw) || 0
   };
   try{
     await api('saveItem', { data });
     toast('Item tersimpan');
-    document.getElementById('itemNama').value = '';
-    document.getElementById('itemSatuan').value = '';
-    document.getElementById('itemGroup').value = '';
-    document.getElementById('itemPorsi').value = '';
+    clearItemForm();
     loadItemMaster();
   } catch(e){ toast(e.message, true); }
 });
@@ -1160,9 +1222,9 @@ async function loadLaporan(){
   `;
   const head = document.getElementById('lapTableHead');
   head.innerHTML = `<th>Tanggal</th><th>Item</th><th class="right">Qty</th><th class="right">Total Belanja</th>
-    ${canSeeModal ? '<th class="right">Modal</th><th class="right">Margin</th>' : ''}`;
+    ${canSeeModal ? '<th class="right">Harga Satuan</th><th class="right">Jumlah</th><th class="right">Modal</th><th class="right">Margin</th>' : ''}`;
   const tb = document.getElementById('lapTableBody'); tb.innerHTML = '';
-  const colCount = 4 + (canSeeModal?2:0);
+  const colCount = 4 + (canSeeModal?4:0);
   if(!data.rows.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Tidak ada data pada rentang ini</td></tr>`; return; }
   data.rows.forEach(r => {
     const tr = document.createElement('tr');
@@ -1172,6 +1234,8 @@ async function loadLaporan(){
       <td data-label="Qty" class="right num">${r['Qty']}</td>
       <td data-label="Total Belanja" class="right num">${fmtRupiah(r['Total Belanja'])}</td>
       ${canSeeModal ? `
+      <td data-label="Harga Satuan" class="right num">${fmtRupiah(r['Harga Satuan Item'])}</td>
+      <td data-label="Jumlah" class="right num">${fmtRupiah(r['Jumlah Item'])}</td>
       <td data-label="Modal" class="right num">${fmtRupiah(r['Total Modal'])}</td>
       <td data-label="Margin" class="right num">${fmtRupiah(r['Margin'])}</td>` : ''}
     `;
