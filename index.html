@@ -21,6 +21,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
   :root{
     --bg:#F6F7F1; --paper:#FFFFFF; --ink:#1E2A20; --ink-soft:#5C6B5E;
@@ -107,6 +109,20 @@
   .status-dot.filled{background:var(--ok);}
   .status-dot.other{background:var(--ink-soft);}
   .helptext{font-size:12px; color:var(--ink-soft);}
+
+  .wa-item-row{display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px dashed var(--line);}
+  .wa-item-row:last-child{border-bottom:none;}
+  .wa-check{
+    width:20px; height:20px; border-radius:5px; border:2px solid var(--line); flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; color:#fff;
+    transition:background .15s, border-color .15s;
+  }
+  .wa-check.sent{background:#B9BFB6; border-color:#B9BFB6;}
+  .wa-check.selected{background:var(--leaf-dark); border-color:var(--leaf-dark);}
+  .wa-item-info{flex:1; min-width:0;}
+  .wa-item-info .nm{font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .wa-item-info .meta{font-size:11px; color:var(--ink-soft);}
+  .wa-item-row.was-sent .wa-item-info .nm{color:var(--ink-soft);}
 
   tr.po-date-group td{
     background:var(--leaf); color:#fff; font-weight:600; padding:9px 10px;
@@ -204,11 +220,17 @@
       <div class="row" style="margin-bottom:6px;">
         <div class="field" style="min-width:100%;"><label>Kategori 1 — Suplier <span style="font-weight:400; text-transform:none;">(Anda — isi harga satuan)</span></label></div>
       </div>
+      <div class="row" style="margin-bottom:8px;">
+        <div class="field"><input type="text" id="regSuplierNama" placeholder="Nama UD / Usaha"></div>
+        <div class="field"><input type="text" id="regSuplierNamaPemilik" placeholder="Nama Pemilik UD"></div>
+      </div>
+      <div class="row" style="margin-bottom:8px;">
+        <div class="field"><input type="email" id="regSuplierEmail" placeholder="Email Google (login)"></div>
+        <div class="field"><input type="email" id="regSuplierEmailUD" placeholder="Email UD (untuk invoice)"></div>
+      </div>
       <div class="row" style="margin-bottom:14px;">
-        <div class="field"><input type="text" id="regSuplierNama" placeholder="Nama"></div>
-        <div class="field"><input type="email" id="regSuplierEmail" placeholder="Email Google"></div>
-        <div class="field"><input type="text" id="regSuplierPosisi" placeholder="Posisi"></div>
-        <div class="field"><input type="text" id="regSuplierWa" placeholder="No. WhatsApp"></div>
+        <div class="field"><input type="text" id="regSuplierPosisi" placeholder="Posisi (mis. Direktur)"></div>
+        <div class="field"><input type="text" id="regSuplierWa" placeholder="No. HP Pemilik UD"></div>
       </div>
 
       <div class="row" style="margin-bottom:6px;">
@@ -306,7 +328,11 @@
       <div class="card">
         <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:14px;">
           <h2 style="margin:0;">Daftar PO</h2>
-          <button class="btn btn-accent btn-sm" id="openWaSendBtn" style="display:none;">Kirim PO ke WA Suplier</button>
+          <div class="row" style="gap:8px;">
+            <button class="btn btn-ghost btn-sm" id="openInvoiceBtn" style="display:none;">📄 Invoice PDF</button>
+            <button class="btn btn-ghost btn-sm" id="openPrintDoBtn" style="display:none;">🖨 Print DO</button>
+            <button class="btn btn-accent btn-sm" id="openWaSendBtn" style="display:none;">Kirim PO ke WA Suplier</button>
+          </div>
         </div>
         <div class="table-wrap"><table class="compact-table">
           <thead><tr id="poTableHead"></tr></thead>
@@ -400,9 +426,10 @@
     <section class="view" id="view-users">
       <div class="card">
         <h2>Kelola User <span class="tag" id="usersTag">SPPG Aktif</span></h2>
+        <p class="helptext" id="userFormMode" style="margin:-4px 0 8px;"></p>
         <div class="row item-row-form">
           <div class="field"><label>Email Google</label><input type="email" id="newUserEmail"></div>
-          <div class="field"><label>Nama</label><input type="text" id="newUserNama"></div>
+          <div class="field"><label>Nama <span style="font-weight:400;">(Nama UD kalau Suplier)</span></label><input type="text" id="newUserNama"></div>
           <div class="field">
             <label>Role</label>
             <select id="newUserRole">
@@ -413,10 +440,13 @@
               <option value="admin">admin (akses penuh 1 SPPG)</option>
             </select>
           </div>
-          <div class="field"><label>Posisi</label><input type="text" id="newUserPosisi" placeholder="mis. Kepala SPPG"></div>
-          <div class="field"><label>No. WhatsApp</label><input type="text" id="newUserWa"></div>
+          <div class="field"><label>Posisi</label><input type="text" id="newUserPosisi" placeholder="mis. Kepala SPPG / Direktur"></div>
+          <div class="field"><label>No. WhatsApp / No. HP Pemilik UD</label><input type="text" id="newUserWa"></div>
+          <div class="field"><label>Nama Pemilik UD <span style="font-weight:400;">(khusus Suplier)</span></label><input type="text" id="newUserNamaPemilik"></div>
+          <div class="field"><label>Email UD <span style="font-weight:400;">(khusus Suplier, untuk invoice)</span></label><input type="email" id="newUserEmailUD"></div>
           <div class="field"><label>SPPG</label><select id="newUserSppg"></select></div>
           <div class="field" style="flex:0;"><label>&nbsp;</label><button class="btn btn-primary" id="addUserBtn">Tambah</button></div>
+          <div class="field" style="flex:0;" id="cancelEditUserWrap"><label>&nbsp;</label><button class="btn btn-ghost" id="cancelEditUserBtn" type="button" style="display:none;">Batal Edit</button></div>
         </div>
         <div class="table-wrap"><table>
           <thead><tr><th>Email</th><th>Nama</th><th>Posisi</th><th>Role</th><th>No. WA</th><th>SPPG</th><th>Aktif</th><th></th></tr></thead>
@@ -449,7 +479,7 @@
 </div>
 
 <div class="confirm-overlay" id="waSendOverlay">
-  <div class="confirm-box" style="max-width:360px; text-align:left;">
+  <div class="confirm-box" style="max-width:400px; text-align:left;">
     <h3 style="margin:0 0 12px; font-size:16px;">Kirim PO ke WA Suplier</h3>
     <div class="field" style="margin-bottom:10px;">
       <label>Tanggal PO</label>
@@ -460,9 +490,51 @@
       <select id="waSendSupplierSelect"></select>
     </div>
     <p id="waSendInfo" class="helptext" style="margin:6px 0 0;"></p>
+    <div id="waSendItemList" style="max-height:260px; overflow-y:auto; margin-top:10px;"></div>
     <div class="confirm-actions" style="margin-top:16px;">
       <button class="btn btn-ghost btn-sm" id="waSendCancelBtn">Batal</button>
-      <button class="btn btn-accent btn-sm" id="waSendConfirmBtn">Kirim Sekarang</button>
+      <button class="btn btn-accent btn-sm" id="waSendConfirmBtn" disabled>Kirim WA</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="printDoOverlay">
+  <div class="confirm-box" style="max-width:420px; text-align:left;">
+    <h3 style="margin:0 0 12px; font-size:16px;">Print DO (Bluetooth 58mm)</h3>
+    <div class="field" style="margin-bottom:10px;">
+      <label>Tanggal PO</label>
+      <input type="date" id="printDoTanggal">
+    </div>
+    <p id="printDoInfo" class="helptext" style="margin:6px 0 0;">Chrome Android/Desktop saja. Pastikan printer thermal Bluetooth sudah menyala &amp; dalam mode pairing.</p>
+    <div id="printDoItemList" style="max-height:200px; overflow-y:auto; margin-top:10px;"></div>
+
+    <div style="margin-top:12px;">
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-soft); font-weight:600; margin-bottom:6px;">Preview Struk</div>
+      <pre id="printDoPreview" style="background:#fff; border:1px solid var(--line); border-radius:6px; padding:10px; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.5; white-space:pre; overflow-x:auto; color:#111; margin:0;">Pilih tanggal &amp; centang item untuk lihat preview.</pre>
+    </div>
+
+    <div class="confirm-actions" style="margin-top:16px;">
+      <button class="btn btn-ghost btn-sm" id="printDoCancelBtn">Batal</button>
+      <button class="btn btn-accent btn-sm" id="printDoConfirmBtn" disabled>Cetak DO</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="invoiceOverlay">
+  <div class="confirm-box" style="max-width:400px; text-align:left;">
+    <h3 style="margin:0 0 12px; font-size:16px;">Buat Invoice PDF</h3>
+    <div class="row" style="margin-bottom:8px;">
+      <div class="field"><label>Tanggal Periode</label><input type="date" id="invoiceTanggal"></div>
+      <div class="field"><label>Nomor Surat</label><input type="text" id="invoiceNomorSurat" placeholder="mis. 001/UD-BJ/VII/2026"></div>
+    </div>
+    <div class="row" style="margin-bottom:8px;">
+      <div class="field"><label>Nama Kota</label><input type="text" id="invoiceKota" placeholder="mis. Batam"></div>
+      <div class="field"><label>Posisi Penandatangan</label><input type="text" id="invoicePosisi" placeholder="mis. Direktur"></div>
+    </div>
+    <p id="invoiceInfo" class="helptext" style="margin:6px 0 0;"></p>
+    <div class="confirm-actions" style="margin-top:16px;">
+      <button class="btn btn-ghost btn-sm" id="invoiceCancelBtn">Batal</button>
+      <button class="btn btn-accent btn-sm" id="invoiceConfirmBtn">Buat &amp; Lihat PDF</button>
     </div>
   </div>
 </div>
@@ -628,7 +700,9 @@ document.getElementById('submitRegisterBtn').addEventListener('click', async () 
       nama: document.getElementById('regSuplierNama').value.trim(),
       email: document.getElementById('regSuplierEmail').value.trim() || state.email,
       posisi: document.getElementById('regSuplierPosisi').value.trim() || 'Suplier',
-      noWa: document.getElementById('regSuplierWa').value.trim()
+      noWa: document.getElementById('regSuplierWa').value.trim(),
+      namaPemilikUD: document.getElementById('regSuplierNamaPemilik').value.trim(),
+      emailUD: document.getElementById('regSuplierEmailUD').value.trim()
     },
     keuangan: {
       nama: document.getElementById('regKeuanganNama').value.trim(),
@@ -869,8 +943,11 @@ let poListCache = [];
 
 async function loadPO(){
   const canCreate = ['admin','keuangan'].includes(state.role);
+  const canPrint = ['admin','suplier'].includes(state.role);
   document.getElementById('poFormCard').style.display = canCreate ? 'block' : 'none';
   document.getElementById('openWaSendBtn').style.display = canCreate ? 'inline-flex' : 'none';
+  document.getElementById('openPrintDoBtn').style.display = canPrint ? 'inline-flex' : 'none';
+  document.getElementById('openInvoiceBtn').style.display = canPrint ? 'inline-flex' : 'none';
   itemMasterCache = [];
   try{ itemMasterCache = await api('getItems', {}); }catch(e){}
   if(canCreate && !document.getElementById('poFormRows').children.length) addPoRow();
@@ -1204,6 +1281,7 @@ document.getElementById('submitPoBtn').addEventListener('click', async () => {
 
 /* ---------------- KIRIM PO KE WA SUPLIER ---------------- */
 let waSuppliersCache = [];
+let waSelectedIds = new Set();
 
 function normalizeWaNumber(raw){
   let digits = String(raw || '').replace(/[^0-9]/g, '');
@@ -1220,7 +1298,9 @@ document.getElementById('openWaSendBtn').addEventListener('click', async () => {
   const supplierSelect = document.getElementById('waSendSupplierSelect');
   const info = document.getElementById('waSendInfo');
   tanggalInput.value = lastPoTanggal || '';
+  waSelectedIds = new Set();
   info.textContent = 'Memuat kontak suplier...';
+  document.getElementById('waSendItemList').innerHTML = '';
   overlay.classList.add('show');
 
   try{ waSuppliersCache = await api('getSupplierContacts', {}); }
@@ -1238,15 +1318,65 @@ document.getElementById('openWaSendBtn').addEventListener('click', async () => {
     supplierSelect.innerHTML = withWa.map((s,i) => `<option value="${i}">${s.Nama} (${s.NoWA})</option>`).join('');
     info.textContent = '';
   }
+
+  renderWaItemList();
 });
+
+document.getElementById('waSendTanggal').addEventListener('change', renderWaItemList);
+
+function renderWaItemList(){
+  const tanggal = document.getElementById('waSendTanggal').value;
+  const wrap = document.getElementById('waSendItemList');
+  waSelectedIds = new Set();
+  updateWaSendButtonState();
+  if(!tanggal){ wrap.innerHTML = ''; return; }
+
+  const rowsForDate = poListCache.filter(po => isoDate(po['Tanggal']) === tanggal);
+  if(!rowsForDate.length){
+    wrap.innerHTML = '<p class="helptext">Tidak ada PO untuk tanggal ini.</p>';
+    return;
+  }
+
+  wrap.innerHTML = rowsForDate.map(po => {
+    const wasSent = String(po['WA_Terkirim']).toUpperCase() === 'YA';
+    return `<div class="wa-item-row ${wasSent?'was-sent':''}" data-id="${po['ID']}">
+      <div class="wa-check ${wasSent?'sent':''}" data-was-sent="${wasSent}"></div>
+      <div class="wa-item-info">
+        <div class="nm">${po['Item']}</div>
+        <div class="meta">${po['Qty']} ${po['Unit']}${wasSent ? ' · sudah pernah dikirim' : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  wrap.querySelectorAll('.wa-item-row').forEach(row => {
+    const checkEl = row.querySelector('.wa-check');
+    checkEl.addEventListener('click', () => {
+      const id = row.dataset.id;
+      const wasSent = checkEl.dataset.wasSent === 'true';
+      if(waSelectedIds.has(id)){
+        waSelectedIds.delete(id);
+        checkEl.classList.remove('selected');
+        checkEl.classList.toggle('sent', wasSent);
+      } else {
+        waSelectedIds.add(id);
+        checkEl.classList.remove('sent');
+        checkEl.classList.add('selected');
+      }
+      updateWaSendButtonState();
+    });
+  });
+}
+
+function updateWaSendButtonState(){
+  document.getElementById('waSendConfirmBtn').disabled = waSelectedIds.size === 0;
+}
 
 document.getElementById('waSendCancelBtn').addEventListener('click', () => {
   document.getElementById('waSendOverlay').classList.remove('show');
 });
 
 document.getElementById('waSendConfirmBtn').addEventListener('click', async () => {
-  const tanggal = document.getElementById('waSendTanggal').value;
-  if(!tanggal){ toast('Pilih tanggal PO', true); return; }
+  if(!waSelectedIds.size){ toast('Centang minimal satu item', true); return; }
 
   const withWa = waSuppliersCache.filter(s => normalizeWaNumber(s.NoWA));
   if(!withWa.length){ toast('Tidak ada nomor WA suplier terdaftar', true); return; }
@@ -1260,9 +1390,10 @@ document.getElementById('waSendConfirmBtn').addEventListener('click', async () =
   const originalText = btn.textContent;
   btn.textContent = 'Mengirim...';
   try{
-    const result = await api('sendPOWhatsApp', { tanggal, supplierEmail: chosen.Email });
+    const result = await api('sendPOWhatsApp', { poIds: Array.from(waSelectedIds), supplierEmail: chosen.Email });
     toast(`PO terkirim ke ${result.target} (${result.count} item)`);
     document.getElementById('waSendOverlay').classList.remove('show');
+    loadPO();
   } catch(e){
     toast(e.message, true);
   } finally {
@@ -1275,6 +1406,330 @@ function isoDate(d){
   const dt = new Date(d);
   if(isNaN(dt)) return '';
   return dt.toISOString().slice(0,10);
+}
+
+/* ---------------- PRINT DO (BLUETOOTH THERMAL PRINTER) ---------------- */
+let doSelectedIds = new Set();
+let doPrinterCharacteristic = null; // koneksi printer dipertahankan selama sesi supaya tidak pairing ulang tiap cetak
+
+const PRINTER_SERVICE_UUIDS = [
+  '000018f0-0000-1000-8000-00805f9b34fb',
+  '0000ff00-0000-1000-8000-00805f9b34fb',
+  '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+  '0000ffe0-0000-1000-8000-00805f9b34fb',
+  '0000fee7-0000-1000-8000-00805f9b34fb'
+];
+
+document.getElementById('openPrintDoBtn').addEventListener('click', () => {
+  const overlay = document.getElementById('printDoOverlay');
+  document.getElementById('printDoTanggal').value = lastPoTanggal || '';
+  doSelectedIds = new Set();
+  overlay.classList.add('show');
+  renderPrintDoItemList();
+});
+
+document.getElementById('printDoTanggal').addEventListener('change', () => { renderPrintDoItemList(); renderPrintDoPreview(); });
+
+function renderPrintDoItemList(){
+  const tanggal = document.getElementById('printDoTanggal').value;
+  const wrap = document.getElementById('printDoItemList');
+  doSelectedIds = new Set();
+  updatePrintDoButtonState();
+  if(!tanggal){ wrap.innerHTML = ''; renderPrintDoPreview(); return; }
+
+  const rowsForDate = poListCache.filter(po => isoDate(po['Tanggal']) === tanggal);
+  if(!rowsForDate.length){
+    wrap.innerHTML = '<p class="helptext">Tidak ada PO untuk tanggal ini.</p>';
+    renderPrintDoPreview();
+    return;
+  }
+
+  wrap.innerHTML = rowsForDate.map(po => {
+    const wasPrinted = String(po['DO_Tercetak']).toUpperCase() === 'YA';
+    return `<div class="wa-item-row ${wasPrinted?'was-sent':''}" data-id="${po['ID']}">
+      <div class="wa-check ${wasPrinted?'sent':''}" data-was-sent="${wasPrinted}"></div>
+      <div class="wa-item-info">
+        <div class="nm">${po['Item']}</div>
+        <div class="meta">${po['Qty']} ${po['Unit']}${wasPrinted ? ' · sudah pernah dicetak' : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  wrap.querySelectorAll('.wa-item-row').forEach(row => {
+    const checkEl = row.querySelector('.wa-check');
+    checkEl.addEventListener('click', () => {
+      const id = row.dataset.id;
+      const wasPrinted = checkEl.dataset.wasSent === 'true';
+      if(doSelectedIds.has(id)){
+        doSelectedIds.delete(id);
+        checkEl.classList.remove('selected');
+        checkEl.classList.toggle('sent', wasPrinted);
+      } else {
+        doSelectedIds.add(id);
+        checkEl.classList.remove('sent');
+        checkEl.classList.add('selected');
+      }
+      updatePrintDoButtonState();
+      renderPrintDoPreview();
+    });
+  });
+  renderPrintDoPreview();
+}
+
+function updatePrintDoButtonState(){
+  document.getElementById('printDoConfirmBtn').disabled = doSelectedIds.size === 0;
+}
+
+document.getElementById('printDoCancelBtn').addEventListener('click', () => {
+  document.getElementById('printDoOverlay').classList.remove('show');
+});
+
+async function connectBluetoothPrinter(){
+  if(!navigator.bluetooth){
+    throw new Error('Browser ini tidak mendukung Bluetooth Web API. Gunakan Chrome di Android/Desktop, bukan Safari/in-app browser.');
+  }
+  const device = await navigator.bluetooth.requestDevice({ acceptAllDevices:true, optionalServices: PRINTER_SERVICE_UUIDS });
+  const server = await device.gatt.connect();
+  for(const svcUuid of PRINTER_SERVICE_UUIDS){
+    try{
+      const service = await server.getPrimaryService(svcUuid);
+      const chars = await service.getCharacteristics();
+      const writable = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
+      if(writable) return writable;
+    }catch(e){ /* service tidak ada di printer ini, coba UUID berikutnya */ }
+  }
+  throw new Error('Printer terhubung tapi service cetak tidak dikenali. Model printer ini mungkin belum didukung.');
+}
+
+async function writeToPrinter(characteristic, bytes){
+  const chunkSize = 20; // batas aman ukuran tiap paket BLE write
+  for(let i=0; i<bytes.length; i+=chunkSize){
+    const chunk = bytes.slice(i, i+chunkSize);
+    if(characteristic.properties.writeWithoutResponse){
+      await characteristic.writeValueWithoutResponse(chunk);
+    } else {
+      await characteristic.writeValue(chunk);
+    }
+    await new Promise(r => setTimeout(r, 25));
+  }
+}
+
+/* Printer 58mm (Font A) muat sekitar 32 karakter per baris. */
+const DO_COL_NO = 3, DO_COL_ITEM = 15, DO_COL_QTY = 5, DO_COL_SAT = 7;
+function padCol(str, width, right){
+  str = String(str == null ? '' : str);
+  if(str.length > width) str = str.slice(0, width);
+  return right ? str.padStart(width, ' ') : str.padEnd(width, ' ');
+}
+
+/** Bangun teks struk polos (dipakai untuk preview DAN untuk dikirim ke printer). */
+function buildDoReceiptText(items, tanggalLabel){
+  const namaUd = state.nama || 'Suplier';
+  const lines = [];
+  lines.push(namaUd);
+  lines.push(tanggalLabel);
+  lines.push('-'.repeat(DO_COL_NO+DO_COL_ITEM+DO_COL_QTY+DO_COL_SAT));
+  lines.push(padCol('No', DO_COL_NO) + padCol('Item', DO_COL_ITEM) + padCol('Qty', DO_COL_QTY, true) + padCol('Sat', DO_COL_SAT, true));
+  lines.push('-'.repeat(DO_COL_NO+DO_COL_ITEM+DO_COL_QTY+DO_COL_SAT));
+  items.forEach((it, i) => {
+    lines.push(padCol(i+1, DO_COL_NO) + padCol(it.nama, DO_COL_ITEM) + padCol(it.qty, DO_COL_QTY, true) + padCol(it.satuan, DO_COL_SAT, true));
+  });
+  lines.push('-'.repeat(DO_COL_NO+DO_COL_ITEM+DO_COL_QTY+DO_COL_SAT));
+  lines.push('');
+  lines.push('Terima kasih');
+  return lines.join('\n');
+}
+
+function renderPrintDoPreview(){
+  const pre = document.getElementById('printDoPreview');
+  const tanggal = document.getElementById('printDoTanggal').value;
+  if(!tanggal || !doSelectedIds.size){
+    pre.textContent = 'Pilih tanggal & centang item untuk lihat preview.';
+    return;
+  }
+  const items = poListCache
+    .filter(po => doSelectedIds.has(String(po['ID'])))
+    .map(po => ({ nama: po['Item'], qty: po['Qty'], satuan: po['Unit'] }));
+  pre.textContent = buildDoReceiptText(items, fmtDate(tanggal));
+}
+
+function buildDoEscPos(items, tanggalLabel){
+  const enc = new TextEncoder();
+  const bytes = [];
+  const push = (arr) => arr.forEach(b => bytes.push(b));
+
+  push([0x1B,0x40]);          // reset printer
+  push(Array.from(enc.encode(buildDoReceiptText(items, tanggalLabel))));
+  push([0x0A,0x0A,0x0A]);     // spasi sebelum potong
+  push([0x1D,0x56,0x01]);     // potong kertas (diabaikan kalau printer tidak punya cutter)
+
+  return new Uint8Array(bytes);
+}
+
+document.getElementById('printDoConfirmBtn').addEventListener('click', async () => {
+  if(!doSelectedIds.size){ toast('Centang minimal satu item', true); return; }
+  const tanggal = document.getElementById('printDoTanggal').value;
+  const rowsForDate = poListCache.filter(po => doSelectedIds.has(String(po['ID'])));
+  if(!rowsForDate.length){ toast('Item tidak ditemukan', true); return; }
+
+  const btn = document.getElementById('printDoConfirmBtn');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+
+  try{
+    if(!doPrinterCharacteristic){
+      btn.textContent = 'Menghubungkan printer...';
+      doPrinterCharacteristic = await connectBluetoothPrinter();
+    }
+    btn.textContent = 'Mencetak...';
+    const items = rowsForDate.map(po => ({ nama: po['Item'], qty: po['Qty'], satuan: po['Unit'] }));
+    const bytes = buildDoEscPos(items, fmtDate(tanggal));
+    await writeToPrinter(doPrinterCharacteristic, bytes);
+
+    await api('markPoPrinted', { poIds: Array.from(doSelectedIds) });
+    toast(`DO tercetak (${items.length} item)`);
+    document.getElementById('printDoOverlay').classList.remove('show');
+    loadPO();
+  } catch(e){
+    doPrinterCharacteristic = null; // koneksi kemungkinan putus, coba sambung ulang lain kali
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+});
+
+/* ---------------- INVOICE PDF (SUPLIER) ---------------- */
+let myProfileCache = null;
+
+document.getElementById('openInvoiceBtn').addEventListener('click', async () => {
+  const overlay = document.getElementById('invoiceOverlay');
+  const info = document.getElementById('invoiceInfo');
+  document.getElementById('invoiceTanggal').value = lastPoTanggal || '';
+  document.getElementById('invoiceNomorSurat').value = '';
+  info.textContent = 'Memuat profil...';
+  overlay.classList.add('show');
+
+  try{
+    myProfileCache = await api('getMyProfile', {});
+    document.getElementById('invoicePosisi').value = myProfileCache.Posisi || '';
+    let kota = '';
+    try{ kota = localStorage.getItem('invoiceKota_' + state.sppgId) || ''; }catch(e){}
+    document.getElementById('invoiceKota').value = kota;
+    if(!myProfileCache.NamaPemilikUD){
+      info.textContent = 'Nama Pemilik UD belum diisi. Lengkapi dulu lewat Kelola User supaya tanda tangan invoice terisi.';
+    } else {
+      info.textContent = '';
+    }
+  } catch(e){
+    info.textContent = '';
+    toast(e.message, true);
+  }
+});
+
+document.getElementById('invoiceCancelBtn').addEventListener('click', () => {
+  document.getElementById('invoiceOverlay').classList.remove('show');
+});
+
+document.getElementById('invoiceConfirmBtn').addEventListener('click', async () => {
+  const tanggal = document.getElementById('invoiceTanggal').value;
+  const nomorSurat = document.getElementById('invoiceNomorSurat').value.trim();
+  const kota = document.getElementById('invoiceKota').value.trim();
+  const posisi = document.getElementById('invoicePosisi').value.trim();
+
+  if(!tanggal){ toast('Pilih tanggal periode', true); return; }
+  if(!nomorSurat){ toast('Isi nomor surat', true); return; }
+  if(!kota){ toast('Isi nama kota', true); return; }
+
+  const rowsForDate = poListCache.filter(po => isoDate(po['Tanggal']) === tanggal);
+  if(!rowsForDate.length){ toast('Tidak ada PO untuk tanggal ini', true); return; }
+  if(!window.jspdf){ toast('Library PDF belum termuat, coba lagi sebentar', true); return; }
+
+  try{ localStorage.setItem('invoiceKota_' + state.sppgId, kota); }catch(e){}
+
+  const profile = myProfileCache || {};
+  generateInvoicePdf({
+    namaDapur: state.sppgNama || '',
+    namaUD: profile.Nama || state.nama || '',
+    namaPemilikUD: profile.NamaPemilikUD || '',
+    posisi: posisi || profile.Posisi || '',
+    nomorSurat, kota,
+    tanggalLabel: fmtDate(tanggal),
+    items: rowsForDate.map(po => ({
+      nama: po['Item'], satuan: po['Unit'], qty: Number(po['Qty'])||0,
+      hargaSatuan: Number(po['Unit Price'])||0
+    }))
+  });
+
+  document.getElementById('invoiceOverlay').classList.remove('show');
+});
+
+function generateInvoicePdf(d){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginL = 20, marginR = 20;
+  let y = 22;
+
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(11);
+
+  // Header kiri: Kepada Yth
+  doc.text('Kepada Yth,', marginL, y);
+  doc.text('Kepala SPPG', marginL, y+6);
+  doc.text(d.namaDapur, marginL, y+12);
+
+  // Header kanan: nomor surat & hal
+  doc.text('Nomor Surat : ' + d.nomorSurat, pageWidth - marginR, y, { align:'right' });
+  doc.text('Hal : Tagihan Bahan Baku periode ' + d.tanggalLabel, pageWidth - marginR, y+6, { align:'right' });
+
+  y += 26;
+
+  // Tabel item
+  let no = 0;
+  const total = d.items.reduce((s,it) => s + it.qty*it.hargaSatuan, 0);
+  const body = d.items.map(it => {
+    no++;
+    const jumlah = it.qty * it.hargaSatuan;
+    return [String(no), it.nama, it.satuan, 'Rp' + it.hargaSatuan.toLocaleString('id-ID'), 'Rp' + jumlah.toLocaleString('id-ID')];
+  });
+
+  doc.autoTable({
+    startY: y,
+    head: [['No.','Item','Satuan','Harga Satuan','Jumlah']],
+    body: body,
+    foot: [['', '', '', 'TOTAL', 'Rp' + total.toLocaleString('id-ID')]],
+    theme: 'grid',
+    styles: { fontSize: 10, cellPadding: 2 },
+    headStyles: { fillColor: [47,74,52], textColor: 255, fontStyle: 'bold' },
+    footStyles: { fillColor: [240,241,236], textColor: [30,42,32], fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 12, halign:'center' },
+      1: { cellWidth: 'auto' },
+      2: { cellWidth: 22, halign:'center' },
+      3: { cellWidth: 32, halign:'right' },
+      4: { cellWidth: 32, halign:'right' }
+    },
+    margin: { left: marginL, right: marginR }
+  });
+
+  let closingY = doc.lastAutoTable.finalY + 16;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  if(closingY > pageHeight - 55){ doc.addPage(); closingY = 25; }
+
+  doc.text(d.kota + ', ' + d.tanggalLabel, pageWidth - marginR, closingY, { align:'right' });
+  doc.text('Hormat kami,', pageWidth - marginR, closingY+6, { align:'right' });
+  doc.text(d.namaUD, pageWidth - marginR, closingY+12, { align:'right' });
+
+  const signY = closingY + 30;
+  const namaSigner = d.namaPemilikUD || '________________';
+  doc.text(namaSigner, pageWidth - marginR, signY, { align:'right' });
+  const signerWidth = doc.getTextWidth(namaSigner);
+  doc.line(pageWidth - marginR - signerWidth, signY+1.5, pageWidth - marginR, signY+1.5);
+  doc.text(d.posisi || '', pageWidth - marginR, signY+6, { align:'right' });
+
+  const filename = 'Invoice_' + (d.nomorSurat||'DO').replace(/[^a-zA-Z0-9]/g,'_') + '.pdf';
+  doc.save(filename);
 }
 
 /* ---------------- LAPORAN ---------------- */
@@ -1317,6 +1772,8 @@ async function loadLaporan(){
 document.getElementById('lapFilterBtn').addEventListener('click', loadLaporan);
 
 /* ---------------- USERS (admin: 1 SPPG, superadmin: semua) ---------------- */
+let editingUserKey = null; // {Email, SPPG_ID} baris yang sedang diedit, null kalau mode tambah baru
+
 async function loadUsers(){
   const isSuperadmin = state.role === 'superadmin';
   const realSppgOptions = state.options.filter(o => o.sppgId); // buang opsi "Admin Pusat" (sppgId null)
@@ -1346,16 +1803,52 @@ async function loadUsers(){
       <td data-label="No. WA">${u.NoWA || '-'}</td>
       <td data-label="SPPG">${sppgLabel}</td>
       <td data-label="Aktif">${u.Aktif}</td>
-      <td data-label=""><button class="btn btn-ghost btn-sm toggle-active">${String(u.Aktif).toUpperCase()==='YA'?'Nonaktifkan':'Aktifkan'}</button></td>
+      <td data-label=""><button class="btn btn-ghost btn-sm edit-user-btn">Edit</button> <button class="btn btn-ghost btn-sm toggle-active">${String(u.Aktif).toUpperCase()==='YA'?'Nonaktifkan':'Aktifkan'}</button></td>
     `;
+    tr.querySelector('.edit-user-btn').addEventListener('click', () => startEditUser(u));
     tr.querySelector('.toggle-active').addEventListener('click', async () => {
       const newAktif = String(u.Aktif).toUpperCase()==='YA' ? 'TIDAK' : 'YA';
-      try{ await api('saveUser', { data:{ Email:u.Email, Nama:u.Nama, Role:u.Role, SPPG_ID:u.SPPG_ID, Aktif:newAktif, Posisi:u.Posisi, NoWA:u.NoWA } }); loadUsers(); }
+      try{ await api('saveUser', { data:{ Email:u.Email, Nama:u.Nama, Role:u.Role, SPPG_ID:u.SPPG_ID, Aktif:newAktif, Posisi:u.Posisi, NoWA:u.NoWA, NamaPemilikUD:u.NamaPemilikUD, EmailUD:u.EmailUD } }); loadUsers(); }
       catch(e){ toast(e.message, true); }
     });
     tb.appendChild(tr);
   });
 }
+
+function startEditUser(u){
+  editingUserKey = { Email: u.Email, SPPG_ID: u.SPPG_ID };
+  document.getElementById('newUserEmail').value = u.Email;
+  document.getElementById('newUserEmail').disabled = true; // email = kunci baris, tidak diubah saat edit
+  document.getElementById('newUserNama').value = u.Nama || '';
+  document.getElementById('newUserRole').value = u.Role;
+  document.getElementById('newUserPosisi').value = u.Posisi || '';
+  document.getElementById('newUserWa').value = u.NoWA || '';
+  document.getElementById('newUserNamaPemilik').value = u.NamaPemilikUD || '';
+  document.getElementById('newUserEmailUD').value = u.EmailUD || '';
+  if(document.getElementById('newUserSppg').querySelector(`option[value="${u.SPPG_ID}"]`)){
+    document.getElementById('newUserSppg').value = u.SPPG_ID;
+  }
+  document.getElementById('addUserBtn').textContent = 'Simpan Perubahan';
+  document.getElementById('cancelEditUserBtn').style.display = 'inline-flex';
+  document.getElementById('userFormMode').textContent = `Mengedit: ${u.Email}`;
+  document.querySelector('#view-users .card').scrollIntoView({behavior:'smooth'});
+}
+
+function resetUserForm(){
+  editingUserKey = null;
+  document.getElementById('newUserEmail').disabled = false;
+  document.getElementById('newUserEmail').value = '';
+  document.getElementById('newUserNama').value = '';
+  document.getElementById('newUserPosisi').value = '';
+  document.getElementById('newUserWa').value = '';
+  document.getElementById('newUserNamaPemilik').value = '';
+  document.getElementById('newUserEmailUD').value = '';
+  document.getElementById('addUserBtn').textContent = 'Tambah';
+  document.getElementById('cancelEditUserBtn').style.display = 'none';
+  document.getElementById('userFormMode').textContent = '';
+}
+document.getElementById('cancelEditUserBtn').addEventListener('click', resetUserForm);
+
 document.getElementById('addUserBtn').addEventListener('click', async () => {
   const isSuperadmin = state.role === 'superadmin';
   const data = {
@@ -1364,11 +1857,18 @@ document.getElementById('addUserBtn').addEventListener('click', async () => {
     Role: document.getElementById('newUserRole').value,
     Posisi: document.getElementById('newUserPosisi').value.trim(),
     NoWA: document.getElementById('newUserWa').value.trim(),
+    NamaPemilikUD: document.getElementById('newUserNamaPemilik').value.trim(),
+    EmailUD: document.getElementById('newUserEmailUD').value.trim(),
     SPPG_ID: isSuperadmin ? document.getElementById('newUserSppg').value : state.sppgId,
     Aktif: 'YA'
   };
   if(!data.Email){ toast('Isi email', true); return; }
-  try{ await api('saveUser', {data}); toast('User tersimpan'); document.getElementById('newUserEmail').value=''; document.getElementById('newUserNama').value=''; document.getElementById('newUserPosisi').value=''; document.getElementById('newUserWa').value=''; loadUsers(); }
+  try{
+    await api('saveUser', {data});
+    toast(editingUserKey ? 'Perubahan tersimpan' : 'User tersimpan');
+    resetUserForm();
+    loadUsers();
+  }
   catch(e){ toast(e.message, true); }
 });
 </script>
