@@ -6,6 +6,18 @@
 <title>Pengadaan Bahan Baku SPPG</title>
 <meta name="theme-color" content="#2F4A34">
 <link rel="manifest" href="manifest.json">
+
+<!-- Preview saat link di-share (WhatsApp, dll) -->
+<meta property="og:title" content="PO SPPG — Pengadaan Bahan Baku">
+<meta property="og:description" content="Sistem PM · PO · Harga Suplier untuk SPPG.">
+<meta property="og:image" content="https://bwahanad.github.io/pengadaan-sppg-/icon-512.png">
+<meta property="og:url" content="https://bwahanad.github.io/pengadaan-sppg-/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+
+<!-- Ikon untuk Add to Home Screen -->
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -159,6 +171,10 @@
     <p>Masuk dengan akun Google terdaftar</p>
     <div id="gsiBtn"></div>
     <div class="errtext" id="loginError"></div>
+    <button class="btn btn-ghost btn-sm" id="installAppBtn" style="display:none; width:100%; justify-content:center; margin-top:14px;">⬇ Pasang Aplikasi "PO SPPG" ke Layar HP</button>
+    <p class="helptext" id="iosInstallHint" style="display:none; margin-top:12px;">
+      Di iPhone: tap ikon <b>Share</b> (kotak dengan panah ke atas) di Safari, lalu pilih <b>"Add to Home Screen"</b> supaya ikon "PO SPPG" muncul di layar HP.
+    </p>
   </div>
 </div>
 
@@ -241,25 +257,25 @@
     <!-- ============ PM VIEW ============ -->
     <section class="view" id="view-pm">
       <div class="card" id="pmFormCard" style="display:none;">
-        <h2>Buat / Edit PM <span class="tag">Perkiraan Makan</span></h2>
+        <h2>Buat / Edit PM <span class="tag">Penerima Manfaat</span></h2>
         <div class="row">
           <div class="field"><label>Mulai</label><input type="date" id="pmMulai"></div>
           <div class="field"><label>Sampai</label><input type="date" id="pmSampai"></div>
         </div>
         <div class="row" style="margin-top:10px;">
           <div class="field"><label>Kecil — Sen</label><input type="number" class="pm-day-input" id="pk_sen"></div>
+          <div class="field"><label>Besar — Sen</label><input type="number" class="pm-day-input" id="pb_sen"></div>
           <div class="field"><label>Kecil — Sel</label><input type="number" class="pm-day-input" id="pk_sel"></div>
+          <div class="field"><label>Besar — Sel</label><input type="number" class="pm-day-input" id="pb_sel"></div>
           <div class="field"><label>Kecil — Rab</label><input type="number" class="pm-day-input" id="pk_rab"></div>
-          <div class="field"><label>Kecil — Kam</label><input type="number" class="pm-day-input" id="pk_kam"></div>
-          <div class="field"><label>Kecil — Jum</label><input type="number" class="pm-day-input" id="pk_jum"></div>
-          <div class="field"><label>Kecil — Sab</label><input type="number" class="pm-day-input" id="pk_sab"></div>
+          <div class="field"><label>Besar — Rab</label><input type="number" class="pm-day-input" id="pb_rab"></div>
         </div>
         <div class="row" style="margin-top:6px;">
-          <div class="field"><label>Besar — Sen</label><input type="number" class="pm-day-input" id="pb_sen"></div>
-          <div class="field"><label>Besar — Sel</label><input type="number" class="pm-day-input" id="pb_sel"></div>
-          <div class="field"><label>Besar — Rab</label><input type="number" class="pm-day-input" id="pb_rab"></div>
+          <div class="field"><label>Kecil — Kam</label><input type="number" class="pm-day-input" id="pk_kam"></div>
           <div class="field"><label>Besar — Kam</label><input type="number" class="pm-day-input" id="pb_kam"></div>
+          <div class="field"><label>Kecil — Jum</label><input type="number" class="pm-day-input" id="pk_jum"></div>
           <div class="field"><label>Besar — Jum</label><input type="number" class="pm-day-input" id="pb_jum"></div>
+          <div class="field"><label>Kecil — Sab</label><input type="number" class="pm-day-input" id="pk_sab"></div>
           <div class="field"><label>Besar — Sab</label><input type="number" class="pm-day-input" id="pb_sab"></div>
         </div>
         <p style="font-size:13px; color:var(--ink-soft); margin:10px 0 0;">
@@ -528,6 +544,33 @@ window.onload = () => {
   google.accounts.id.renderButton(document.getElementById('gsiBtn'), { theme:'outline', size:'large', shape:'pill', text:'signin_with' });
 };
 
+/* ---------------- PASANG APLIKASI KE LAYAR HP ---------------- */
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const btn = document.getElementById('installAppBtn');
+  if(btn) btn.style.display = 'flex';
+});
+document.getElementById('installAppBtn').addEventListener('click', async () => {
+  if(!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  document.getElementById('installAppBtn').style.display = 'none';
+});
+window.addEventListener('appinstalled', () => {
+  const btn = document.getElementById('installAppBtn');
+  if(btn) btn.style.display = 'none';
+});
+
+// iOS Safari tidak mendukung beforeinstallprompt -- tampilkan instruksi manual sebagai gantinya
+const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+if(isIos && !isInStandaloneMode){
+  document.getElementById('iosInstallHint').style.display = 'block';
+}
+
 async function onGoogleCredential(response){
   try{
     state.idToken = response.credential;
@@ -727,12 +770,15 @@ async function loadPendingSppg(){
 }
 
 /* ---------------- PM ---------------- */
+let pmListCache = [];
+
 async function loadPM(){
   const canEdit = ['admin','keuangan'].includes(state.role);
   document.getElementById('pmFormCard').style.display = canEdit ? 'block' : 'none';
   if(canEdit) restorePmFormDefaults();
   let list = [];
   try{ list = await api('getPM', {}); }catch(e){ toast(e.message, true); }
+  pmListCache = list;
   const tb = document.getElementById('pmTableBody'); tb.innerHTML = '';
   if(!list.length){ tb.innerHTML = '<tr><td colspan="5" class="empty">Belum ada data PM</td></tr>'; }
   list.forEach(pm => {
@@ -747,6 +793,17 @@ async function loadPM(){
     tb.appendChild(tr);
   });
   loadPmDropdownForPO(list);
+}
+
+/** Cek apakah rentang [mulai, sampai] beririsan dengan periode PM manapun yang sudah ada. */
+function findOverlappingPm(mulai, sampai){
+  const newStart = new Date(mulai);
+  const newEnd = new Date(sampai);
+  return pmListCache.find(pm => {
+    const existStart = new Date(pm['Mulai']);
+    const existEnd = new Date(pm['Sampai']);
+    return newStart <= existEnd && newEnd >= existStart;
+  });
 }
 
 const PM_FIELD_IDS = ['pmMulai','pmSampai','pk_sen','pk_sel','pk_rab','pk_kam','pk_jum','pk_sab','pb_sen','pb_sel','pb_rab','pb_kam','pb_jum','pb_sab'];
@@ -770,15 +827,21 @@ function restorePmFormDefaults(){
 }
 
 document.getElementById('savePmBtn').addEventListener('click', async () => {
-  const data = {
-    'Mulai': document.getElementById('pmMulai').value,
-    'Sampai': document.getElementById('pmSampai').value,
-  };
+  const mulai = document.getElementById('pmMulai').value;
+  const sampai = document.getElementById('pmSampai').value;
+  if(!mulai || !sampai){ toast('Isi tanggal Mulai & Sampai', true); return; }
+
+  const overlap = findOverlappingPm(mulai, sampai);
+  if(overlap){
+    await showAlert('Tanggal ini sudah dibuat PM pada periode sebelumnya\n(' + fmtDate(overlap['Mulai']) + ' – ' + fmtDate(overlap['Sampai']) + ')');
+    return;
+  }
+
+  const data = { 'Mulai': mulai, 'Sampai': sampai };
   HARI.forEach(h => {
     data['PM kecil '+HARI_LABEL[h]] = Number(document.getElementById('pk_'+h).value)||0;
     data['PM Besar '+HARI_LABEL[h]] = Number(document.getElementById('pb_'+h).value)||0;
   });
-  if(!data['Mulai'] || !data['Sampai']){ toast('Isi tanggal Mulai & Sampai', true); return; }
   try{ await api('createPM', {data}); toast('PM tersimpan'); savePmFormDefaults(); loadPM(); }
   catch(e){ toast(e.message, true); }
 });
@@ -1010,7 +1073,16 @@ async function loadItemMaster(){
   if(canEditModal){
     tb.querySelectorAll('.item-modal-input').forEach(inp => {
       inp.addEventListener('change', async () => {
-        try{ await api('saveItemModal', { data:{ ID: inp.dataset.id, Item: inp.dataset.nama, 'Unit Price': Number(inp.value) } }); toast('Modal tersimpan'); loadItemMaster(); }
+        try{
+          const result = await api('saveItemModal', { data:{ ID: inp.dataset.id, Item: inp.dataset.nama, 'Unit Price': Number(inp.value) } });
+          const typed = Number(inp.value) || 0;
+          if(result.price > typed){
+            toast(`Modal tersimpan sebagai ${fmtRupiah(result.price)} (harga tertinggi yang pernah diinput, bukan angka barusan)`);
+          } else {
+            toast('Modal tersimpan');
+          }
+          loadItemMaster();
+        }
         catch(e){ toast(e.message, true); }
       });
     });
