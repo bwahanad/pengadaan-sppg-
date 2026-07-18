@@ -675,9 +675,9 @@ function loadPmDropdownForPO(list){
 async function loadPO(){
   const canCreate = ['admin','keuangan'].includes(state.role);
   document.getElementById('poFormCard').style.display = canCreate ? 'block' : 'none';
-  if(canCreate && !document.getElementById('poFormRows').children.length) addPoRow();
   itemMasterCache = [];
   try{ itemMasterCache = await api('getItems', {}); }catch(e){}
+  if(canCreate && !document.getElementById('poFormRows').children.length) addPoRow();
 
   const from = document.getElementById('poFrom').value;
   const to = document.getElementById('poTo').value;
@@ -756,21 +756,44 @@ function renderPOTable(list){
   }
 }
 
+const GROUP_OPTIONS = ['Karbo','Protein Hewani','Protein Nabati','Sayur','Buah','Bumbu','Susu'];
+
 function addPoRow(){
   const wrap = document.getElementById('poFormRows');
   const div = document.createElement('div');
   div.className = 'item-row-form row';
+  const groupOptionsHtml = GROUP_OPTIONS.map(g => `<option value="${g}">${g}</option>`).join('');
   div.innerHTML = `
     <div class="field"><label>Tanggal</label><input type="date" class="po-tanggal"></div>
-    <div class="field" style="flex:2;"><label>Item</label><input type="text" list="itemDatalist" class="po-item" placeholder="nama item"></div>
+    <div class="field"><label>Group</label><select class="po-group"><option value="">Pilih Group</option>${groupOptionsHtml}</select></div>
+    <div class="field" style="flex:2;"><label>Item</label><select class="po-item"><option value="">Pilih Group dulu</option></select></div>
     <div class="field"><label>Qty</label><input type="number" class="po-qty"></div>
-    <div class="field"><label>Unit</label><input type="text" class="po-unit" placeholder="kg / pcs / dus"></div>
+    <div class="field"><label>Unit</label><input type="text" class="po-unit" readonly placeholder="otomatis"></div>
     <div class="field" style="flex:0;"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" type="button" onclick="this.closest('.item-row-form').remove()">Hapus</button></div>
   `;
   wrap.appendChild(div);
-  let dl = document.getElementById('itemDatalist');
-  if(!dl){ dl = document.createElement('datalist'); dl.id = 'itemDatalist'; document.body.appendChild(dl); }
-  dl.innerHTML = itemMasterCache.map(it => `<option value="${it['Item']}">`).join('');
+
+  const groupSel = div.querySelector('.po-group');
+  const itemSel = div.querySelector('.po-item');
+  const unitInput = div.querySelector('.po-unit');
+
+  groupSel.addEventListener('change', () => {
+    const group = groupSel.value;
+    unitInput.value = '';
+    if(!group){
+      itemSel.innerHTML = '<option value="">Pilih Group dulu</option>';
+      return;
+    }
+    const items = itemMasterCache.filter(it => it['Group'] === group);
+    itemSel.innerHTML = items.length
+      ? '<option value="">Pilih Item</option>' + items.map(it => `<option value="${it['Item']}">${it['Item']}</option>`).join('')
+      : '<option value="">(belum ada item di group ini)</option>';
+  });
+
+  itemSel.addEventListener('change', () => {
+    const found = itemMasterCache.find(it => it['Group'] === groupSel.value && it['Item'] === itemSel.value);
+    unitInput.value = found ? (found['satuan'] || '') : '';
+  });
 }
 document.getElementById('addPoRowBtn').addEventListener('click', addPoRow);
 
@@ -873,16 +896,18 @@ document.getElementById('submitPoBtn').addEventListener('click', async () => {
   const rows = [];
   document.querySelectorAll('#poFormRows .item-row-form').forEach(r => {
     const item = r.querySelector('.po-item').value.trim();
+    const group = r.querySelector('.po-group').value.trim();
     if(!item) return;
     rows.push({
       Tanggal: r.querySelector('.po-tanggal').value,
       Item: item,
+      Group: group,
       Qty: Number(r.querySelector('.po-qty').value) || 0,
       Unit: r.querySelector('.po-unit').value.trim(),
       Kategori: 'bahan baku'
     });
   });
-  if(!rows.length){ toast('Isi minimal satu baris item', true); return; }
+  if(!rows.length){ toast('Pilih minimal satu item', true); return; }
   const pmId = document.getElementById('poFormPm').value;
   try{
     await api('createPO', { rows, pmId });
