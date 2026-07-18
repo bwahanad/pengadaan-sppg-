@@ -140,32 +140,38 @@
 
 <!-- ================= DAFTAR DAPUR BARU ================= -->
 <div class="center-screen" id="registerScreen" style="display:none;">
-  <div class="center-card" style="max-width:520px;">
+  <div class="center-card" style="max-width:560px;">
     <div class="login-mark">SD</div>
     <h1>Daftar Dapur Baru</h1>
     <p>Email <b id="regEmail"></b> belum terdaftar. Isi data dapur Bapak di bawah ini.</p>
     <div class="row" style="text-align:left;">
       <div class="field" style="min-width:100%;"><label>Nama SPPG / Dapur</label><input type="text" id="regNamaSppg" placeholder="mis. SPPG Dapur Melati"></div>
-      <div class="field" style="min-width:100%;"><label>Nama Admin</label><input type="text" id="regNamaAdmin" placeholder="Nama Bapak/Ibu"></div>
       <div class="field" style="min-width:100%;"><label>Link Google Sheet Dapur</label><input type="text" id="regLink" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
     </div>
 
     <div style="text-align:left; margin-top:16px; padding-top:14px; border-top:1px dashed var(--line);">
-      <p style="font-size:12px; color:var(--ink-soft); margin:0 0 10px;">
-        Opsional — bisa diisi sekarang atau ditambahkan nanti lewat "Kelola User" setelah disetujui.
-      </p>
-      <div class="row" style="margin-bottom:8px;">
-        <div class="field" style="min-width:100%;"><label>Kategori 1 — Keuangan <span style="font-weight:400; text-transform:none;">(input PM, PO, Item master)</span></label></div>
-        <div class="field"><input type="text" id="regKeuanganNama" placeholder="Nama"></div>
-        <div class="field"><input type="email" id="regKeuanganEmail" placeholder="Email Google"></div>
+      <div class="row" style="margin-bottom:6px;">
+        <div class="field" style="min-width:100%;"><label>Kategori 1 — Suplier <span style="font-weight:400; text-transform:none;">(Anda — isi harga satuan)</span></label></div>
       </div>
-      <div class="row" style="margin-bottom:8px;">
-        <div class="field" style="min-width:100%;"><label>Kategori 2 — Suplier <span style="font-weight:400; text-transform:none;">(isi harga satuan saja)</span></label></div>
+      <div class="row" style="margin-bottom:14px;">
         <div class="field"><input type="text" id="regSuplierNama" placeholder="Nama"></div>
         <div class="field"><input type="email" id="regSuplierEmail" placeholder="Email Google"></div>
+        <div class="field"><input type="text" id="regSuplierPosisi" placeholder="Posisi"></div>
+        <div class="field"><input type="text" id="regSuplierWa" placeholder="No. WhatsApp"></div>
       </div>
-      <div class="row">
-        <div class="field" style="min-width:100%;"><label>Kategori 3 — Dapur <span style="font-weight:400; text-transform:none;">(lihat PM &amp; PO saja, bisa lebih dari 1 orang)</span></label></div>
+
+      <div class="row" style="margin-bottom:6px;">
+        <div class="field" style="min-width:100%;"><label>Kategori 2 — Pengawas Keuangan <span style="font-weight:400; text-transform:none;">(input PM, PO, Item master)</span></label></div>
+      </div>
+      <div class="row" style="margin-bottom:14px;">
+        <div class="field"><input type="text" id="regKeuanganNama" placeholder="Nama"></div>
+        <div class="field"><input type="email" id="regKeuanganEmail" placeholder="Email Google"></div>
+        <div class="field"><input type="text" id="regKeuanganPosisi" value="Pengawas Keuangan"></div>
+        <div class="field"><input type="text" id="regKeuanganWa" placeholder="No. WhatsApp"></div>
+      </div>
+
+      <div class="row" style="margin-bottom:6px;">
+        <div class="field" style="min-width:100%;"><label>Kategori 3 — Monitoring <span style="font-weight:400; text-transform:none;">(lihat PM &amp; PO saja, bisa lebih dari 1 orang)</span></label></div>
       </div>
       <div id="regDapurRows"></div>
       <button class="btn btn-ghost btn-sm" id="addDapurRowBtn" type="button" style="margin-top:2px;">+ Tambah orang</button>
@@ -252,8 +258,35 @@
           <div class="field" style="flex:0;"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" id="poFilterBtn">Terapkan</button></div>
         </div>
         <div class="table-wrap"><table>
-          <thead><tr><th>ID</th><th>Tanggal</th><th>Item</th><th class="right">Qty</th><th>Unit</th><th class="right">Harga Satuan</th><th class="right">Total Belanja</th><th>Status</th></tr></thead>
+          <thead><tr id="poTableHead"></tr></thead>
           <tbody id="poTableBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ============ ITEM MASTER VIEW ============ -->
+    <section class="view" id="view-item">
+      <div class="card" id="itemFormCard" style="display:none;">
+        <h2>Tambah / Edit Item <span class="tag">Data Deskriptif</span></h2>
+        <p style="font-size:12px; color:var(--ink-soft); margin-top:-6px;">
+          Untuk item yang sudah ada, ketik nama item persis sama untuk mengedit. Modal/harga pokok
+          diisi terpisah oleh Suplier.
+        </p>
+        <div class="row">
+          <div class="field" style="flex:2;"><label>Nama Item</label><input type="text" id="itemNama" placeholder="mis. Beras"></div>
+          <div class="field"><label>Satuan</label><input type="text" id="itemSatuan" placeholder="kg / pcs / dus"></div>
+          <div class="field"><label>Group</label><input type="text" id="itemGroup"></div>
+          <div class="field"><label>Kategori</label><input type="text" id="itemKategori" value="bahan baku"></div>
+          <div class="field"><label>Porsi per Unit</label><input type="number" id="itemPorsi"></div>
+        </div>
+        <div style="margin-top:14px;"><button class="btn btn-primary" id="saveItemBtn">Simpan Item</button></div>
+      </div>
+
+      <div class="card">
+        <h2>Daftar Item</h2>
+        <div class="table-wrap"><table>
+          <thead><tr id="itemTableHead"></tr></thead>
+          <tbody id="itemTableBody"></tbody>
         </table></div>
       </div>
     </section>
@@ -271,7 +304,7 @@
       </div>
       <div class="card">
         <div class="table-wrap"><table>
-          <thead><tr><th>Tanggal</th><th>Item</th><th class="right">Qty</th><th class="right">Total Belanja</th><th class="right">Modal</th><th class="right">Margin</th></tr></thead>
+          <thead><tr id="lapTableHead"></tr></thead>
           <tbody id="lapTableBody"></tbody>
         </table></div>
       </div>
@@ -301,17 +334,20 @@
           <div class="field">
             <label>Role</label>
             <select id="newUserRole">
-              <option value="admin">admin (1 SPPG)</option>
-              <option value="keuangan">keuangan</option>
-              <option value="suplier">suplier</option>
-              <option value="dapur">dapur</option>
+              <option value="suplier">Suplier (isi harga &amp; modal)</option>
+              <option value="keuangan">Pengawas Keuangan (PM/PO/Item)</option>
+              <option value="dapur">Monitoring (read-only)</option>
+              <option value="investor">Investor (lihat semua termasuk modal, read-only)</option>
+              <option value="admin">admin (akses penuh 1 SPPG)</option>
             </select>
           </div>
+          <div class="field"><label>Posisi</label><input type="text" id="newUserPosisi" placeholder="mis. Kepala SPPG"></div>
+          <div class="field"><label>No. WhatsApp</label><input type="text" id="newUserWa"></div>
           <div class="field"><label>SPPG</label><select id="newUserSppg"></select></div>
           <div class="field" style="flex:0;"><label>&nbsp;</label><button class="btn btn-primary" id="addUserBtn">Tambah</button></div>
         </div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Email</th><th>Nama</th><th>Role</th><th>SPPG</th><th>Aktif</th><th></th></tr></thead>
+          <thead><tr><th>Email</th><th>Nama</th><th>Posisi</th><th>Role</th><th>No. WA</th><th>SPPG</th><th>Aktif</th><th></th></tr></thead>
           <tbody id="usersTableBody"></tbody>
         </table></div>
       </div>
@@ -387,19 +423,22 @@ function showRegister(){
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('registerScreen').style.display = 'flex';
   document.getElementById('regEmail').textContent = state.email;
+  document.getElementById('regSuplierEmail').value = state.email;
+  document.getElementById('regSuplierPosisi').value = 'Suplier';
   document.getElementById('regDapurRows').innerHTML = '';
   ['Kepala SPPG','Pengawas Gizi','Kepala Masak'].forEach(addDapurRow);
 }
 
-function addDapurRow(jabatanHint){
+function addDapurRow(posisiHint){
   const wrap = document.getElementById('regDapurRows');
   const div = document.createElement('div');
   div.className = 'row';
   div.style.marginBottom = '6px';
   div.innerHTML = `
-    <div class="field"><input type="text" class="reg-dapur-jabatan" placeholder="${jabatanHint ? 'mis. '+jabatanHint : 'Jabatan (opsional)'}"></div>
     <div class="field"><input type="text" class="reg-dapur-nama" placeholder="Nama"></div>
     <div class="field"><input type="email" class="reg-dapur-email" placeholder="Email Google"></div>
+    <div class="field"><input type="text" class="reg-dapur-posisi" value="${posisiHint || ''}" placeholder="Posisi"></div>
+    <div class="field"><input type="text" class="reg-dapur-wa" placeholder="No. WhatsApp"></div>
     <div class="field" style="flex:0;"><button class="btn btn-ghost btn-sm" type="button" onclick="this.closest('.row').remove()">✕</button></div>
   `;
   wrap.appendChild(div);
@@ -408,26 +447,38 @@ document.getElementById('addDapurRowBtn').addEventListener('click', () => addDap
 
 document.getElementById('submitRegisterBtn').addEventListener('click', async () => {
   const namaSppg = document.getElementById('regNamaSppg').value.trim();
-  const namaAdmin = document.getElementById('regNamaAdmin').value.trim();
   const link = document.getElementById('regLink').value.trim();
   document.getElementById('registerError').textContent = '';
   if(!namaSppg || !link){ document.getElementById('registerError').textContent = 'Nama SPPG dan link spreadsheet wajib diisi'; return; }
 
   const tim = {
-    keuangan: { nama: document.getElementById('regKeuanganNama').value.trim(), email: document.getElementById('regKeuanganEmail').value.trim() },
-    suplier: { nama: document.getElementById('regSuplierNama').value.trim(), email: document.getElementById('regSuplierEmail').value.trim() },
+    suplier: {
+      nama: document.getElementById('regSuplierNama').value.trim(),
+      email: document.getElementById('regSuplierEmail').value.trim() || state.email,
+      posisi: document.getElementById('regSuplierPosisi').value.trim() || 'Suplier',
+      noWa: document.getElementById('regSuplierWa').value.trim()
+    },
+    keuangan: {
+      nama: document.getElementById('regKeuanganNama').value.trim(),
+      email: document.getElementById('regKeuanganEmail').value.trim(),
+      posisi: document.getElementById('regKeuanganPosisi').value.trim() || 'Pengawas Keuangan',
+      noWa: document.getElementById('regKeuanganWa').value.trim()
+    },
     dapur: []
   };
   document.querySelectorAll('#regDapurRows .row').forEach(r => {
     const email = r.querySelector('.reg-dapur-email').value.trim();
     if(!email) return;
-    const jabatan = r.querySelector('.reg-dapur-jabatan').value.trim();
-    const nama = r.querySelector('.reg-dapur-nama').value.trim();
-    tim.dapur.push({ email, nama: jabatan ? `${nama || email} (${jabatan})` : (nama || email) });
+    tim.dapur.push({
+      email,
+      nama: r.querySelector('.reg-dapur-nama').value.trim(),
+      posisi: r.querySelector('.reg-dapur-posisi').value.trim(),
+      noWa: r.querySelector('.reg-dapur-wa').value.trim()
+    });
   });
 
   try{
-    const res = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'registerSppg', idToken: state.idToken, namaSppg, namaAdmin, spreadsheetLink: link, tim }) });
+    const res = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'registerSppg', idToken: state.idToken, namaSppg, spreadsheetLink: link, tim }) });
     const json = await res.json();
     if(!json.ok) throw new Error(json.error);
     document.getElementById('submitRegisterBtn').style.display = 'none';
@@ -436,8 +487,8 @@ document.getElementById('submitRegisterBtn').addEventListener('click', async () 
     box.innerHTML = `Pendaftaran terkirim untuk kode SPPG <b>${json.data.sppgId}</b>.<br><br>
       Langkah selanjutnya: <b>share spreadsheet dapur Bapak</b> (akses Editor) ke email:<br>
       <span class="mono">${json.data.adminPusatEmail}</span><br><br>
-      Setelah itu, tunggu persetujuan dari Admin Pusat. Tim (Keuangan/Suplier/Dapur) yang tadi diisi
-      akan otomatis aktif bersamaan begitu SPPG disetujui. Anda bisa mencoba login lagi nanti.`;
+      Setelah itu, tunggu persetujuan dari Admin Pusat. Tim (Suplier/Pengawas Keuangan/Monitoring) yang
+      tadi diisi akan otomatis aktif bersamaan begitu SPPG disetujui. Anda bisa mencoba login lagi nanti.`;
   } catch(e){
     document.getElementById('registerError').textContent = e.message;
   }
@@ -490,9 +541,10 @@ async function boot(){
 
 const TAB_DEFS = [
   { id:'approval', label:'Persetujuan SPPG', roles:['superadmin'] },
-  { id:'pm', label:'PM', roles:['admin','keuangan','suplier','dapur'] },
-  { id:'po', label:'PO', roles:['admin','keuangan','suplier','dapur'] },
-  { id:'laporan', label:'Laporan', roles:['admin','keuangan','suplier'] },
+  { id:'pm', label:'PM', roles:['admin','keuangan','suplier','dapur','investor'] },
+  { id:'po', label:'PO', roles:['admin','keuangan','suplier','dapur','investor'] },
+  { id:'item', label:'Item Master', roles:['admin','keuangan','suplier','investor'] },
+  { id:'laporan', label:'Laporan', roles:['admin','keuangan','suplier','investor'] },
   { id:'users', label:'Kelola User', roles:['admin','superadmin'] }
 ];
 
@@ -513,6 +565,7 @@ function showView(id){
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.view===id));
   if(id==='pm') loadPM();
   if(id==='po') loadPO();
+  if(id==='item') loadItemMaster();
   if(id==='laporan') loadLaporan();
   if(id==='users') loadUsers();
   if(id==='approval') loadPendingSppg();
@@ -605,9 +658,20 @@ async function loadPO(){
 document.getElementById('poFilterBtn').addEventListener('click', loadPO);
 
 function renderPOTable(list){
-  const tb = document.getElementById('poTableBody'); tb.innerHTML = '';
-  if(!list.length){ tb.innerHTML = '<tr><td colspan="8" class="empty">Belum ada PO</td></tr>'; return; }
   const canFillPrice = ['admin','suplier'].includes(state.role);
+  const canSeeModal = ['admin','suplier','investor'].includes(state.role);
+  const canEditModal = ['admin','suplier'].includes(state.role);
+  const canDelete = ['admin','keuangan'].includes(state.role);
+
+  const head = document.getElementById('poTableHead');
+  head.innerHTML = `<th>ID</th><th>Tanggal</th><th>Item</th><th class="right">Qty</th><th>Unit</th>
+    <th class="right">Harga Satuan</th><th class="right">Total Belanja</th>
+    ${canSeeModal ? '<th class="right">Modal/Unit</th><th class="right">Total Modal</th>' : ''}
+    <th>Status</th>${canDelete ? '<th></th>' : ''}`;
+
+  const tb = document.getElementById('poTableBody'); tb.innerHTML = '';
+  const colCount = 8 + (canSeeModal?2:0) + (canDelete?1:0);
+  if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Belum ada PO</td></tr>`; return; }
   list.sort((a,b) => new Date(b['Tanggal']) - new Date(a['Tanggal']));
   list.forEach(po => {
     const tr = document.createElement('tr');
@@ -615,6 +679,12 @@ function renderPOTable(list){
     const priceCell = canFillPrice
       ? `<input class="price-input mono" type="number" value="${po['Unit Price']||''}" placeholder="isi harga" data-id="${po['ID']}">`
       : `<span class="num">${po['Unit Price'] ? fmtRupiah(po['Unit Price']) : '-'}</span>`;
+    const modalCells = canSeeModal ? `
+      <td data-label="Modal/Unit" class="right">${canEditModal
+        ? `<input class="price-input mono modal-input" type="number" value="${po['Modal Per Unit']||''}" placeholder="modal" data-id="${po['ID']}">`
+        : `<span class="num">${po['Modal Per Unit'] ? fmtRupiah(po['Modal Per Unit']) : '-'}</span>`}</td>
+      <td data-label="Total Modal" class="right num">${po['Total Modal'] ? fmtRupiah(po['Total Modal']) : '-'}</td>` : '';
+    const deleteCell = canDelete ? `<td data-label=""><button class="btn btn-ghost btn-sm delete-po-btn" data-id="${po['ID']}">Hapus</button></td>` : '';
     tr.innerHTML = `
       <td data-label="ID" class="mono">${po['ID']}</td>
       <td data-label="Tanggal">${fmtDate(po['Tanggal'])}</td>
@@ -623,14 +693,33 @@ function renderPOTable(list){
       <td data-label="Unit">${po['Unit']}</td>
       <td data-label="Harga Satuan" class="right">${priceCell}</td>
       <td data-label="Total Belanja" class="right num">${po['Total Belanja'] ? fmtRupiah(po['Total Belanja']) : '-'}</td>
+      ${modalCells}
       <td data-label="Status"><span class="status-pill ${statusClass}">${po['Status']}</span></td>
+      ${deleteCell}
     `;
     tb.appendChild(tr);
   });
   if(canFillPrice){
-    tb.querySelectorAll('.price-input').forEach(inp => {
+    tb.querySelectorAll('.price-input:not(.modal-input)').forEach(inp => {
       inp.addEventListener('change', async () => {
         try{ await api('updatePOPrice', { id: inp.dataset.id, unitPrice: Number(inp.value) }); toast('Harga tersimpan'); loadPO(); }
+        catch(e){ toast(e.message, true); }
+      });
+    });
+  }
+  if(canEditModal){
+    tb.querySelectorAll('.modal-input').forEach(inp => {
+      inp.addEventListener('change', async () => {
+        try{ await api('updatePOModal', { id: inp.dataset.id, modalPerUnit: Number(inp.value) }); toast('Modal tersimpan'); loadPO(); }
+        catch(e){ toast(e.message, true); }
+      });
+    });
+  }
+  if(canDelete){
+    tb.querySelectorAll('.delete-po-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if(!confirm('Hapus PO ini?')) return;
+        try{ await api('deletePO', { id: btn.dataset.id }); toast('PO dihapus'); loadPO(); }
         catch(e){ toast(e.message, true); }
       });
     });
@@ -654,6 +743,101 @@ function addPoRow(){
   dl.innerHTML = itemMasterCache.map(it => `<option value="${it['Item']}">`).join('');
 }
 document.getElementById('addPoRowBtn').addEventListener('click', addPoRow);
+
+/* ---------------- ITEM MASTER ---------------- */
+async function loadItemMaster(){
+  const canManageDescriptive = ['admin','keuangan'].includes(state.role);
+  const canEditModal = ['admin','suplier'].includes(state.role);
+  const canSeeModal = ['admin','suplier','investor'].includes(state.role);
+  const canDelete = ['admin','keuangan'].includes(state.role);
+  document.getElementById('itemFormCard').style.display = canManageDescriptive ? 'block' : 'none';
+
+  let list = [];
+  try{ list = await api('getItems', {}); } catch(e){ toast(e.message, true); return; }
+  itemMasterCache = list;
+
+  const head = document.getElementById('itemTableHead');
+  head.innerHTML = `<th>Item</th><th>Satuan</th><th>Group</th><th>Kategori</th><th class="right">Porsi/Unit</th>
+    ${canSeeModal ? '<th class="right">Modal (Rp)</th>' : ''}
+    ${(canManageDescriptive||canDelete) ? '<th></th>' : ''}`;
+
+  const tb = document.getElementById('itemTableBody'); tb.innerHTML = '';
+  const colCount = 5 + (canSeeModal?1:0) + ((canManageDescriptive||canDelete)?1:0);
+  if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Belum ada item</td></tr>`; return; }
+  list.forEach(it => {
+    const tr = document.createElement('tr');
+    const modalCell = canSeeModal ? `<td data-label="Modal" class="right">${canEditModal
+      ? `<input class="price-input mono item-modal-input" type="number" value="${it['Unit Price']||''}" placeholder="modal" data-id="${it['ID']}" data-nama="${it['Item']}">`
+      : `<span class="num">${it['Unit Price'] ? fmtRupiah(it['Unit Price']) : '-'}</span>`}</td>` : '';
+    const actionCell = (canManageDescriptive||canDelete) ? `<td data-label="">
+      ${canManageDescriptive ? `<button class="btn btn-ghost btn-sm edit-item-btn" data-id="${it['ID']}">Edit</button>` : ''}
+      ${canDelete ? `<button class="btn btn-ghost btn-sm delete-item-btn" data-id="${it['ID']}">Hapus</button>` : ''}
+    </td>` : '';
+    tr.innerHTML = `
+      <td data-label="Item">${it['Item']}</td>
+      <td data-label="Satuan">${it['satuan']||'-'}</td>
+      <td data-label="Group">${it['Group']||'-'}</td>
+      <td data-label="Kategori">${it['Kategori']||'-'}</td>
+      <td data-label="Porsi/Unit" class="right num">${it['porsi per unit']||'-'}</td>
+      ${modalCell}
+      ${actionCell}
+    `;
+    tb.appendChild(tr);
+  });
+
+  if(canEditModal){
+    tb.querySelectorAll('.item-modal-input').forEach(inp => {
+      inp.addEventListener('change', async () => {
+        try{ await api('saveItemModal', { data:{ ID: inp.dataset.id, Item: inp.dataset.nama, 'Unit Price': Number(inp.value) } }); toast('Modal tersimpan'); loadItemMaster(); }
+        catch(e){ toast(e.message, true); }
+      });
+    });
+  }
+  if(canManageDescriptive){
+    tb.querySelectorAll('.edit-item-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const it = list.find(x => x['ID'] === btn.dataset.id);
+        if(!it) return;
+        document.getElementById('itemNama').value = it['Item'] || '';
+        document.getElementById('itemSatuan').value = it['satuan'] || '';
+        document.getElementById('itemGroup').value = it['Group'] || '';
+        document.getElementById('itemKategori').value = it['Kategori'] || 'bahan baku';
+        document.getElementById('itemPorsi').value = it['porsi per unit'] || '';
+        document.getElementById('itemFormCard').scrollIntoView({behavior:'smooth'});
+      });
+    });
+  }
+  if(canDelete){
+    tb.querySelectorAll('.delete-item-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if(!confirm('Hapus item ini?')) return;
+        try{ await api('deleteItem', { id: btn.dataset.id }); toast('Item dihapus'); loadItemMaster(); }
+        catch(e){ toast(e.message, true); }
+      });
+    });
+  }
+}
+
+document.getElementById('saveItemBtn').addEventListener('click', async () => {
+  const nama = document.getElementById('itemNama').value.trim();
+  if(!nama){ toast('Isi nama item', true); return; }
+  const data = {
+    Item: nama,
+    satuan: document.getElementById('itemSatuan').value.trim(),
+    Group: document.getElementById('itemGroup').value.trim(),
+    Kategori: document.getElementById('itemKategori').value.trim() || 'bahan baku',
+    'porsi per unit': Number(document.getElementById('itemPorsi').value) || ''
+  };
+  try{
+    await api('saveItem', { data });
+    toast('Item tersimpan');
+    document.getElementById('itemNama').value = '';
+    document.getElementById('itemSatuan').value = '';
+    document.getElementById('itemGroup').value = '';
+    document.getElementById('itemPorsi').value = '';
+    loadItemMaster();
+  } catch(e){ toast(e.message, true); }
+});
 
 document.getElementById('submitPoBtn').addEventListener('click', async () => {
   const rows = [];
@@ -686,14 +870,20 @@ async function loadLaporan(){
   let data;
   try{ data = await api('getLaporan', { from, to }); } catch(e){ toast(e.message, true); return; }
   const s = data.summary;
+  const canSeeModal = s.totalModal !== null && s.totalModal !== undefined;
   document.getElementById('lapSummary').innerHTML = `
     <div class="summary-item"><div class="label">Total Belanja</div><div class="value">${fmtRupiah(s.totalBelanja)}</div></div>
+    ${canSeeModal ? `
     <div class="summary-item"><div class="label">Total Modal</div><div class="value">${fmtRupiah(s.totalModal)}</div></div>
     <div class="summary-item ${s.margin>=0?'pos':'neg'}"><div class="label">Margin</div><div class="value">${fmtRupiah(s.margin)}</div></div>
-    <div class="summary-item"><div class="label">% Margin</div><div class="value">${s.pctMargin.toFixed(1)}%</div></div>
+    <div class="summary-item"><div class="label">% Margin</div><div class="value">${s.pctMargin.toFixed(1)}%</div></div>` : ''}
   `;
+  const head = document.getElementById('lapTableHead');
+  head.innerHTML = `<th>Tanggal</th><th>Item</th><th class="right">Qty</th><th class="right">Total Belanja</th>
+    ${canSeeModal ? '<th class="right">Modal</th><th class="right">Margin</th>' : ''}`;
   const tb = document.getElementById('lapTableBody'); tb.innerHTML = '';
-  if(!data.rows.length){ tb.innerHTML = '<tr><td colspan="6" class="empty">Tidak ada data pada rentang ini</td></tr>'; return; }
+  const colCount = 4 + (canSeeModal?2:0);
+  if(!data.rows.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Tidak ada data pada rentang ini</td></tr>`; return; }
   data.rows.forEach(r => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -701,8 +891,9 @@ async function loadLaporan(){
       <td data-label="Item">${r['Item']}</td>
       <td data-label="Qty" class="right num">${r['Qty']}</td>
       <td data-label="Total Belanja" class="right num">${fmtRupiah(r['Total Belanja'])}</td>
+      ${canSeeModal ? `
       <td data-label="Modal" class="right num">${fmtRupiah(r['Total Modal'])}</td>
-      <td data-label="Margin" class="right num">${fmtRupiah(r['Margin'])}</td>
+      <td data-label="Margin" class="right num">${fmtRupiah(r['Margin'])}</td>` : ''}
     `;
     tb.appendChild(tr);
   });
@@ -734,14 +925,16 @@ async function loadUsers(){
     tr.innerHTML = `
       <td data-label="Email">${u.Email}</td>
       <td data-label="Nama">${u.Nama}</td>
+      <td data-label="Posisi">${u.Posisi || '-'}</td>
       <td data-label="Role">${u.Role}</td>
+      <td data-label="No. WA">${u.NoWA || '-'}</td>
       <td data-label="SPPG">${sppgLabel}</td>
       <td data-label="Aktif">${u.Aktif}</td>
       <td data-label=""><button class="btn btn-ghost btn-sm toggle-active">${String(u.Aktif).toUpperCase()==='YA'?'Nonaktifkan':'Aktifkan'}</button></td>
     `;
     tr.querySelector('.toggle-active').addEventListener('click', async () => {
       const newAktif = String(u.Aktif).toUpperCase()==='YA' ? 'TIDAK' : 'YA';
-      try{ await api('saveUser', { data:{ Email:u.Email, Nama:u.Nama, Role:u.Role, SPPG_ID:u.SPPG_ID, Aktif:newAktif } }); loadUsers(); }
+      try{ await api('saveUser', { data:{ Email:u.Email, Nama:u.Nama, Role:u.Role, SPPG_ID:u.SPPG_ID, Aktif:newAktif, Posisi:u.Posisi, NoWA:u.NoWA } }); loadUsers(); }
       catch(e){ toast(e.message, true); }
     });
     tb.appendChild(tr);
@@ -753,11 +946,13 @@ document.getElementById('addUserBtn').addEventListener('click', async () => {
     Email: document.getElementById('newUserEmail').value.trim(),
     Nama: document.getElementById('newUserNama').value.trim(),
     Role: document.getElementById('newUserRole').value,
+    Posisi: document.getElementById('newUserPosisi').value.trim(),
+    NoWA: document.getElementById('newUserWa').value.trim(),
     SPPG_ID: isSuperadmin ? document.getElementById('newUserSppg').value : state.sppgId,
     Aktif: 'YA'
   };
   if(!data.Email){ toast('Isi email', true); return; }
-  try{ await api('saveUser', {data}); toast('User tersimpan'); document.getElementById('newUserEmail').value=''; document.getElementById('newUserNama').value=''; loadUsers(); }
+  try{ await api('saveUser', {data}); toast('User tersimpan'); document.getElementById('newUserEmail').value=''; document.getElementById('newUserNama').value=''; document.getElementById('newUserPosisi').value=''; document.getElementById('newUserWa').value=''; loadUsers(); }
   catch(e){ toast(e.message, true); }
 });
 </script>
