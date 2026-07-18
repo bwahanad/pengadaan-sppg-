@@ -73,6 +73,7 @@
 
   .btn{border:none; border-radius:9px; padding:10px 16px; font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px;}
   .btn-primary{background:var(--leaf); color:#fff;} .btn-primary:hover{background:var(--leaf-dark);}
+  .btn:disabled{opacity:.5; cursor:not-allowed; pointer-events:none;}
   .btn-accent{background:var(--turmeric); color:var(--leaf-dark);} .btn-accent:hover{background:var(--turmeric-dark); color:#fff;}
   .btn-ghost{background:transparent; border:1px solid var(--line); color:var(--ink);}
   .btn-sm{padding:6px 10px; font-size:12px; border-radius:7px;}
@@ -279,7 +280,7 @@
     <section class="view" id="view-po">
       <div class="card" id="poFormCard" style="display:none;">
         <h2>Buat PO Baru <span class="tag">Item &amp; Qty</span></h2>
-        <div class="field" style="max-width:260px;margin-bottom:10px;"><label>Untuk PM</label><select id="poFormPm"></select></div>
+        <div class="field" style="max-width:260px;margin-bottom:10px;"><label>Periode</label><select id="poFormPm"></select></div>
         <div id="poFormRows"></div>
         <button class="btn btn-ghost btn-sm" id="addPoRowBtn" type="button">+ Tambah baris item</button>
         <div style="margin-top:14px;"><button class="btn btn-primary" id="submitPoBtn">Simpan PO</button></div>
@@ -732,7 +733,7 @@ let itemMasterCache = [];
 
 function loadPmDropdownForPO(list){
   const sel = document.getElementById('poFormPm');
-  sel.innerHTML = list.map(p => `<option value="${p['ID PM']}">${p['ID PM']} (${fmtDate(p['Mulai'])}–${fmtDate(p['Sampai'])})</option>`).join('');
+  sel.innerHTML = list.map(p => `<option value="${p['ID PM']}">${fmtDate(p['Mulai'])} - ${fmtDate(p['Sampai'])}</option>`).join('');
 }
 
 async function loadPO(){
@@ -841,6 +842,7 @@ function renderPOTable(list){
 }
 
 const GROUP_OPTIONS = ['Karbo','Protein Hewani','Protein Nabati','Sayur','Buah','Bumbu','Susu'];
+let lastPoTanggal = '';
 
 function addPoRow(){
   const wrap = document.getElementById('poFormRows');
@@ -848,7 +850,7 @@ function addPoRow(){
   div.className = 'item-row-form row';
   const groupOptionsHtml = GROUP_OPTIONS.map(g => `<option value="${g}">${g}</option>`).join('');
   div.innerHTML = `
-    <div class="field"><label>Tanggal</label><input type="date" class="po-tanggal"></div>
+    <div class="field"><label>Tanggal</label><input type="date" class="po-tanggal" value="${lastPoTanggal}"></div>
     <div class="field"><label>Group</label><select class="po-group"><option value="">Pilih Group</option>${groupOptionsHtml}</select></div>
     <div class="field" style="flex:2;"><label>Item</label><select class="po-item"><option value="">Pilih Group dulu</option></select></div>
     <div class="field"><label>Qty</label><input type="number" class="po-qty"></div>
@@ -857,9 +859,12 @@ function addPoRow(){
   `;
   wrap.appendChild(div);
 
+  const tanggalInput = div.querySelector('.po-tanggal');
   const groupSel = div.querySelector('.po-group');
   const itemSel = div.querySelector('.po-item');
   const unitInput = div.querySelector('.po-unit');
+
+  tanggalInput.addEventListener('change', () => { lastPoTanggal = tanggalInput.value; });
 
   groupSel.addEventListener('change', () => {
     const group = groupSel.value;
@@ -993,6 +998,10 @@ document.getElementById('submitPoBtn').addEventListener('click', async () => {
   });
   if(!rows.length){ toast('Pilih minimal satu item', true); return; }
   const pmId = document.getElementById('poFormPm').value;
+  const btn = document.getElementById('submitPoBtn');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'Menyimpan...';
   try{
     await api('createPO', { rows, pmId });
     toast('PO tersimpan');
@@ -1000,6 +1009,10 @@ document.getElementById('submitPoBtn').addEventListener('click', async () => {
     addPoRow();
     loadPO();
   } catch(e){ toast(e.message, true); }
+  finally{
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 });
 
 /* ---------------- LAPORAN ---------------- */
