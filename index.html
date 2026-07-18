@@ -94,6 +94,7 @@
   .status-dot.wait{background:var(--wait);}
   .status-dot.filled{background:var(--ok);}
   .status-dot.other{background:var(--ink-soft);}
+  .helptext{font-size:12px; color:var(--ink-soft);}
 
   tr.po-date-group td{
     background:var(--leaf); color:#fff; font-weight:600; padding:9px 10px;
@@ -287,7 +288,10 @@
       </div>
 
       <div class="card">
-        <h2>Daftar PO</h2>
+        <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <h2 style="margin:0;">Daftar PO</h2>
+          <button class="btn btn-accent btn-sm" id="openWaSendBtn" style="display:none;">Kirim PO ke WA Suplier</button>
+        </div>
         <div class="table-wrap"><table class="compact-table">
           <thead><tr id="poTableHead"></tr></thead>
           <tbody id="poTableBody"></tbody>
@@ -412,6 +416,25 @@
     <div class="confirm-actions">
       <button class="btn btn-ghost btn-sm" id="confirmNoBtn">Batal</button>
       <button class="btn btn-primary btn-sm" id="confirmYesBtn" style="background:var(--danger);">Ya, Hapus</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="waSendOverlay">
+  <div class="confirm-box" style="max-width:360px; text-align:left;">
+    <h3 style="margin:0 0 12px; font-size:16px;">Kirim PO ke WA Suplier</h3>
+    <div class="field" style="margin-bottom:10px;">
+      <label>Tanggal PO</label>
+      <input type="date" id="waSendTanggal">
+    </div>
+    <div class="field" id="waSendSupplierField" style="margin-bottom:6px; display:none;">
+      <label>Kirim ke</label>
+      <select id="waSendSupplierSelect"></select>
+    </div>
+    <p id="waSendInfo" class="helptext" style="margin:6px 0 0;"></p>
+    <div class="confirm-actions" style="margin-top:16px;">
+      <button class="btn btn-ghost btn-sm" id="waSendCancelBtn">Batal</button>
+      <button class="btn btn-accent btn-sm" id="waSendConfirmBtn">Buka WhatsApp</button>
     </div>
   </div>
 </div>
@@ -680,6 +703,7 @@ async function loadPendingSppg(){
 async function loadPM(){
   const canEdit = ['admin','keuangan'].includes(state.role);
   document.getElementById('pmFormCard').style.display = canEdit ? 'block' : 'none';
+  if(canEdit) restorePmFormDefaults();
   let list = [];
   try{ list = await api('getPM', {}); }catch(e){ toast(e.message, true); }
   const tb = document.getElementById('pmTableBody'); tb.innerHTML = '';
@@ -698,6 +722,26 @@ async function loadPM(){
   loadPmDropdownForPO(list);
 }
 
+const PM_FIELD_IDS = ['pmMulai','pmSampai','pk_sen','pk_sel','pk_rab','pk_kam','pk_jum','pk_sab','pb_sen','pb_sel','pb_rab','pb_kam','pb_jum','pb_sab'];
+function pmDefaultsStorageKey(){ return 'pmFormDefaults_' + (state.sppgId || 'unknown'); }
+
+function savePmFormDefaults(){
+  const values = {};
+  PM_FIELD_IDS.forEach(id => { values[id] = document.getElementById(id).value; });
+  try{ localStorage.setItem(pmDefaultsStorageKey(), JSON.stringify(values)); }catch(e){}
+}
+
+function restorePmFormDefaults(){
+  let values = null;
+  try{ values = JSON.parse(localStorage.getItem(pmDefaultsStorageKey())); }catch(e){}
+  if(!values) return;
+  PM_FIELD_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if(el && !el.value && values[id]) el.value = values[id];
+  });
+  updatePmKuotaPreview();
+}
+
 document.getElementById('savePmBtn').addEventListener('click', async () => {
   const data = {
     'Mulai': document.getElementById('pmMulai').value,
@@ -708,7 +752,7 @@ document.getElementById('savePmBtn').addEventListener('click', async () => {
     data['PM Besar '+HARI_LABEL[h]] = Number(document.getElementById('pb_'+h).value)||0;
   });
   if(!data['Mulai'] || !data['Sampai']){ toast('Isi tanggal Mulai & Sampai', true); return; }
-  try{ await api('createPM', {data}); toast('PM tersimpan'); loadPM(); }
+  try{ await api('createPM', {data}); toast('PM tersimpan'); savePmFormDefaults(); loadPM(); }
   catch(e){ toast(e.message, true); }
 });
 
@@ -731,15 +775,19 @@ function loadPmDropdownForPO(list){
   sel.innerHTML = list.map(p => `<option value="${p['ID PM']}">${fmtDate(p['Mulai'])} - ${fmtDate(p['Sampai'])}</option>`).join('');
 }
 
+let poListCache = [];
+
 async function loadPO(){
   const canCreate = ['admin','keuangan'].includes(state.role);
   document.getElementById('poFormCard').style.display = canCreate ? 'block' : 'none';
+  document.getElementById('openWaSendBtn').style.display = canCreate ? 'inline-flex' : 'none';
   itemMasterCache = [];
   try{ itemMasterCache = await api('getItems', {}); }catch(e){}
   if(canCreate && !document.getElementById('poFormRows').children.length) addPoRow();
 
   let list = [];
   try{ list = await api('getPO', {}); }catch(e){ toast(e.message, true); return; }
+  poListCache = list;
   renderPOTable(list);
 }
 
@@ -1006,6 +1054,83 @@ document.getElementById('submitPoBtn').addEventListener('click', async () => {
     btn.textContent = originalText;
   }
 });
+
+/* ---------------- KIRIM PO KE WA SUPLIER ---------------- */
+let waSuppliersCache = [];
+
+function normalizeWaNumber(raw){
+  let digits = String(raw || '').replace(/[^0-9]/g, '');
+  if(!digits) return '';
+  if(digits.startsWith('0')) digits = '62' + digits.slice(1);
+  else if(digits.startsWith('8')) digits = '62' + digits;
+  return digits;
+}
+
+document.getElementById('openWaSendBtn').addEventListener('click', async () => {
+  const overlay = document.getElementById('waSendOverlay');
+  const tanggalInput = document.getElementById('waSendTanggal');
+  const supplierField = document.getElementById('waSendSupplierField');
+  const supplierSelect = document.getElementById('waSendSupplierSelect');
+  const info = document.getElementById('waSendInfo');
+  tanggalInput.value = lastPoTanggal || '';
+  info.textContent = 'Memuat kontak suplier...';
+  overlay.classList.add('show');
+
+  try{ waSuppliersCache = await api('getSupplierContacts', {}); }
+  catch(e){ waSuppliersCache = []; }
+
+  const withWa = waSuppliersCache.filter(s => normalizeWaNumber(s.NoWA));
+  if(!withWa.length){
+    info.textContent = 'Belum ada nomor WhatsApp suplier yang terdaftar untuk SPPG ini. Tambahkan lewat Kelola User.';
+    supplierField.style.display = 'none';
+  } else if(withWa.length === 1){
+    supplierField.style.display = 'none';
+    info.textContent = `Akan dikirim ke: ${withWa[0].Nama} (${withWa[0].NoWA})`;
+  } else {
+    supplierField.style.display = 'block';
+    supplierSelect.innerHTML = withWa.map((s,i) => `<option value="${i}">${s.Nama} (${s.NoWA})</option>`).join('');
+    info.textContent = '';
+  }
+});
+
+document.getElementById('waSendCancelBtn').addEventListener('click', () => {
+  document.getElementById('waSendOverlay').classList.remove('show');
+});
+
+document.getElementById('waSendConfirmBtn').addEventListener('click', () => {
+  const tanggal = document.getElementById('waSendTanggal').value;
+  if(!tanggal){ toast('Pilih tanggal PO', true); return; }
+
+  const withWa = waSuppliersCache.filter(s => normalizeWaNumber(s.NoWA));
+  if(!withWa.length){ toast('Tidak ada nomor WA suplier terdaftar', true); return; }
+  const supplierField = document.getElementById('waSendSupplierField');
+  const chosen = supplierField.style.display === 'block'
+    ? withWa[Number(document.getElementById('waSendSupplierSelect').value)]
+    : withWa[0];
+
+  const rowsForDate = poListCache.filter(po => isoDate(po['Tanggal']) === tanggal);
+  if(!rowsForDate.length){ toast('Tidak ada PO untuk tanggal itu', true); return; }
+
+  const tanggalLabel = fmtDate(tanggal);
+  let msg = `*PO Suplier — ${tanggalLabel}*\n\n`;
+  msg += '```\n';
+  rowsForDate.forEach(po => {
+    msg += `|${po['Item']}|${po['Qty']}|${po['Unit']}|\n`;
+  });
+  msg += '```\n';
+  msg += `\nTotal ${rowsForDate.length} item. Mohon konfirmasi harga satuannya ya. Terima kasih.`;
+
+  const waNumber = normalizeWaNumber(chosen.NoWA);
+  const url = `https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`;
+  window.open(url, '_blank');
+  document.getElementById('waSendOverlay').classList.remove('show');
+});
+
+function isoDate(d){
+  const dt = new Date(d);
+  if(isNaN(dt)) return '';
+  return dt.toISOString().slice(0,10);
+}
 
 /* ---------------- LAPORAN ---------------- */
 async function loadLaporan(){
