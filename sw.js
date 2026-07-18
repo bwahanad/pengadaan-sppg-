@@ -1,4 +1,4 @@
-const CACHE = 'suplier-sppg-v19';
+const CACHE = 'suplier-sppg-v22';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
