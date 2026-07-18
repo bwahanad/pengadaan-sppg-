@@ -434,7 +434,7 @@
     <p id="waSendInfo" class="helptext" style="margin:6px 0 0;"></p>
     <div class="confirm-actions" style="margin-top:16px;">
       <button class="btn btn-ghost btn-sm" id="waSendCancelBtn">Batal</button>
-      <button class="btn btn-accent btn-sm" id="waSendConfirmBtn">Buka WhatsApp</button>
+      <button class="btn btn-accent btn-sm" id="waSendConfirmBtn">Kirim Sekarang</button>
     </div>
   </div>
 </div>
@@ -1110,7 +1110,7 @@ document.getElementById('waSendCancelBtn').addEventListener('click', () => {
   document.getElementById('waSendOverlay').classList.remove('show');
 });
 
-document.getElementById('waSendConfirmBtn').addEventListener('click', () => {
+document.getElementById('waSendConfirmBtn').addEventListener('click', async () => {
   const tanggal = document.getElementById('waSendTanggal').value;
   if(!tanggal){ toast('Pilih tanggal PO', true); return; }
 
@@ -1121,22 +1121,20 @@ document.getElementById('waSendConfirmBtn').addEventListener('click', () => {
     ? withWa[Number(document.getElementById('waSendSupplierSelect').value)]
     : withWa[0];
 
-  const rowsForDate = poListCache.filter(po => isoDate(po['Tanggal']) === tanggal);
-  if(!rowsForDate.length){ toast('Tidak ada PO untuk tanggal itu', true); return; }
-
-  const tanggalLabel = fmtDate(tanggal);
-  let msg = `*PO Suplier — ${tanggalLabel}*\n\n`;
-  msg += '```\n';
-  rowsForDate.forEach(po => {
-    msg += `|${po['Item']}|${po['Qty']}|${po['Unit']}|\n`;
-  });
-  msg += '```\n';
-  msg += `\nTotal ${rowsForDate.length} item. Mohon konfirmasi harga satuannya ya. Terima kasih.`;
-
-  const waNumber = normalizeWaNumber(chosen.NoWA);
-  const url = `https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`;
-  window.open(url, '_blank');
-  document.getElementById('waSendOverlay').classList.remove('show');
+  const btn = document.getElementById('waSendConfirmBtn');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'Mengirim...';
+  try{
+    const result = await api('sendPOWhatsApp', { tanggal, supplierEmail: chosen.Email });
+    toast(`PO terkirim ke ${result.target} (${result.count} item)`);
+    document.getElementById('waSendOverlay').classList.remove('show');
+  } catch(e){
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 });
 
 function isoDate(d){
