@@ -89,6 +89,14 @@
   .status-filled{background:#E4F0E6; color:var(--ok);}
   .status-other{background:#F0F1EC; color:var(--ink-soft);}
 
+  tr.po-date-group td{
+    background:var(--leaf); color:#fff; font-weight:600; padding:9px 10px;
+    border-bottom:none; display:table-cell;
+  }
+  tr.po-date-group .po-date-group-date{font-size:12px;}
+  tr.po-date-group .po-date-group-total{float:right; font-family:'JetBrains Mono'; font-size:12px;}
+  tr.po-date-group:first-child td{border-top-left-radius:8px; border-top-right-radius:8px;}
+
   .price-input{width:110px;}
   .table-wrap{overflow-x:auto; border-radius:10px;}
   .empty{padding:30px; text-align:center; color:var(--ink-soft); font-size:13px;}
@@ -734,41 +742,64 @@ function renderPOTable(list){
   const canDelete = ['admin','keuangan'].includes(state.role);
 
   const head = document.getElementById('poTableHead');
-  head.innerHTML = `<th>ID</th><th>Tanggal</th><th>Item</th><th class="right">Qty</th><th>Unit</th>
+  head.innerHTML = `<th>ID</th><th>Item</th><th class="right">Qty</th><th>Unit</th>
     <th class="right">Harga Satuan</th><th class="right">Total Belanja</th>
     ${canSeeModal ? '<th class="right">Modal/Unit</th><th class="right">Total Modal</th>' : ''}
     <th>Status</th>${canDelete ? '<th></th>' : ''}`;
 
   const tb = document.getElementById('poTableBody'); tb.innerHTML = '';
-  const colCount = 8 + (canSeeModal?2:0) + (canDelete?1:0);
+  const colCount = 7 + (canSeeModal?2:0) + (canDelete?1:0);
   if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Belum ada PO</td></tr>`; return; }
+
   list.sort((a,b) => new Date(b['Tanggal']) - new Date(a['Tanggal']));
+
+  // Kelompokkan per tanggal, urutan tanggal terbaru dulu (mengikuti urutan list yang sudah di-sort)
+  const groups = [];
+  let currentKey = null, currentGroup = null;
   list.forEach(po => {
-    const tr = document.createElement('tr');
-    const statusClass = po['Status']==='menunggu harga' ? 'status-wait' : (po['Status']==='harga terisi' ? 'status-filled' : 'status-other');
-    const priceCell = canFillPrice
-      ? `<input class="price-input mono" type="number" value="${po['Unit Price']||''}" placeholder="isi harga" data-id="${po['ID']}">`
-      : `<span class="num">${po['Unit Price'] ? fmtRupiah(po['Unit Price']) : '-'}</span>`;
-    const modalCells = canSeeModal ? `
-      <td data-label="Modal/Unit" class="right">${canEditModal
-        ? `<input class="price-input mono modal-input" type="number" value="${po['Modal Per Unit']||''}" placeholder="modal" data-id="${po['ID']}">`
-        : `<span class="num">${po['Modal Per Unit'] ? fmtRupiah(po['Modal Per Unit']) : '-'}</span>`}</td>
-      <td data-label="Total Modal" class="right num">${po['Total Modal'] ? fmtRupiah(po['Total Modal']) : '-'}</td>` : '';
-    const deleteCell = canDelete ? `<td data-label=""><button class="btn btn-ghost btn-sm delete-po-btn" data-id="${po['ID']}">Hapus</button></td>` : '';
-    tr.innerHTML = `
-      <td data-label="ID" class="mono">${po['ID']}</td>
-      <td data-label="Tanggal">${fmtDate(po['Tanggal'])}</td>
-      <td data-label="Item">${po['Item']}</td>
-      <td data-label="Qty" class="right num">${po['Qty']}</td>
-      <td data-label="Unit">${po['Unit']}</td>
-      <td data-label="Harga Satuan" class="right">${priceCell}</td>
-      <td data-label="Total Belanja" class="right num">${po['Total Belanja'] ? fmtRupiah(po['Total Belanja']) : '-'}</td>
-      ${modalCells}
-      <td data-label="Status"><span class="status-pill ${statusClass}">${po['Status']}</span></td>
-      ${deleteCell}
-    `;
-    tb.appendChild(tr);
+    const key = fmtDate(po['Tanggal']);
+    if(key !== currentKey){
+      currentGroup = { key, rows: [] };
+      groups.push(currentGroup);
+      currentKey = key;
+    }
+    currentGroup.rows.push(po);
   });
+
+  groups.forEach(group => {
+    const dailyTotal = group.rows.reduce((s, po) => s + (Number(po['Total Belanja']) || 0), 0);
+    const headerTr = document.createElement('tr');
+    headerTr.className = 'po-date-group';
+    headerTr.innerHTML = `<td colspan="${colCount}"><span class="po-date-group-date">${group.key}</span><span class="po-date-group-total">${fmtRupiah(dailyTotal)}</span></td>`;
+    tb.appendChild(headerTr);
+
+    group.rows.forEach(po => {
+      const tr = document.createElement('tr');
+      const statusClass = po['Status']==='menunggu harga' ? 'status-wait' : (po['Status']==='harga terisi' ? 'status-filled' : 'status-other');
+      const priceCell = canFillPrice
+        ? `<input class="price-input mono" type="number" value="${po['Unit Price']||''}" placeholder="isi harga" data-id="${po['ID']}">`
+        : `<span class="num">${po['Unit Price'] ? fmtRupiah(po['Unit Price']) : '-'}</span>`;
+      const modalCells = canSeeModal ? `
+        <td data-label="Modal/Unit" class="right">${canEditModal
+          ? `<input class="price-input mono modal-input" type="number" value="${po['Modal Per Unit']||''}" placeholder="modal" data-id="${po['ID']}">`
+          : `<span class="num">${po['Modal Per Unit'] ? fmtRupiah(po['Modal Per Unit']) : '-'}</span>`}</td>
+        <td data-label="Total Modal" class="right num">${po['Total Modal'] ? fmtRupiah(po['Total Modal']) : '-'}</td>` : '';
+      const deleteCell = canDelete ? `<td data-label=""><button class="btn btn-ghost btn-sm delete-po-btn" data-id="${po['ID']}">Hapus</button></td>` : '';
+      tr.innerHTML = `
+        <td data-label="ID" class="mono">${po['ID']}</td>
+        <td data-label="Item">${po['Item']}</td>
+        <td data-label="Qty" class="right num">${po['Qty']}</td>
+        <td data-label="Unit">${po['Unit']}</td>
+        <td data-label="Harga Satuan" class="right">${priceCell}</td>
+        <td data-label="Total Belanja" class="right num">${po['Total Belanja'] ? fmtRupiah(po['Total Belanja']) : '-'}</td>
+        ${modalCells}
+        <td data-label="Status"><span class="status-pill ${statusClass}">${po['Status']}</span></td>
+        ${deleteCell}
+      `;
+      tb.appendChild(tr);
+    });
+  });
+
   if(canFillPrice){
     tb.querySelectorAll('.price-input:not(.modal-input)').forEach(inp => {
       inp.addEventListener('change', async () => {
