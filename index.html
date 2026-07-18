@@ -89,6 +89,11 @@
   .status-filled{background:#E4F0E6; color:var(--ok);}
   .status-other{background:#F0F1EC; color:var(--ink-soft);}
 
+  .status-dot{width:7px; height:7px; border-radius:50%; display:inline-block; margin-right:5px; flex-shrink:0;}
+  .status-dot.wait{background:var(--wait);}
+  .status-dot.filled{background:var(--ok);}
+  .status-dot.other{background:var(--ink-soft);}
+
   tr.po-date-group td{
     background:var(--leaf); color:#fff; font-weight:600; padding:9px 10px;
     border-bottom:none; display:table-cell;
@@ -129,6 +134,16 @@
     tbody tr{display:block; border-bottom:2px solid var(--line); padding:8px 0;}
     tbody td{display:flex; justify-content:space-between; border-bottom:none; padding:5px 4px;}
     tbody td::before{content:attr(data-label); font-size:10px; text-transform:uppercase; color:var(--ink-soft); font-weight:600;}
+
+    /* Tabel PO tetap horizontal & kompak (tidak jadi kartu bertumpuk), supaya >=5 baris item kelihatan tanpa scroll */
+    .po-table thead{display:table-header-group;}
+    .po-table thead th{font-size:9px; padding:4px 3px;}
+    .po-table tbody tr.po-date-group{display:table-row; border-bottom:none;}
+    .po-table tbody tr:not(.po-date-group){display:table-row; padding:0;}
+    .po-table tbody td{display:table-cell; padding:6px 3px; font-size:11.5px; vertical-align:middle;}
+    .po-table tbody td::before{content:none;}
+    .po-table .price-input{width:64px; padding:5px 4px; font-size:11.5px;}
+    .po-table .po-item-name{max-width:78px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:middle;}
   }
 </style>
 </head>
@@ -277,7 +292,7 @@
           <div class="field"><label>Sampai</label><input type="date" id="poTo"></div>
           <div class="field" style="flex:0;"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" id="poFilterBtn">Terapkan</button></div>
         </div>
-        <div class="table-wrap"><table>
+        <div class="table-wrap"><table class="po-table">
           <thead><tr id="poTableHead"></tr></thead>
           <tbody id="poTableBody"></tbody>
         </table></div>
@@ -742,13 +757,13 @@ function renderPOTable(list){
   const canDelete = ['admin','keuangan'].includes(state.role);
 
   const head = document.getElementById('poTableHead');
-  head.innerHTML = `<th>ID</th><th>Item</th><th class="right">Qty</th><th>Unit</th>
-    <th class="right">Harga Satuan</th><th class="right">Total Belanja</th>
+  head.innerHTML = `<th>Item</th><th class="right">Qty</th><th>Satuan</th>
+    <th class="right">Harga Satuan</th><th class="right">Jumlah</th>
     ${canSeeModal ? '<th class="right">Modal/Unit</th><th class="right">Total Modal</th>' : ''}
-    <th>Status</th>${canDelete ? '<th></th>' : ''}`;
+    ${canDelete ? '<th></th>' : ''}`;
 
   const tb = document.getElementById('poTableBody'); tb.innerHTML = '';
-  const colCount = 7 + (canSeeModal?2:0) + (canDelete?1:0);
+  const colCount = 5 + (canSeeModal?2:0) + (canDelete?1:0);
   if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Belum ada PO</td></tr>`; return; }
 
   list.sort((a,b) => new Date(b['Tanggal']) - new Date(a['Tanggal']));
@@ -775,25 +790,23 @@ function renderPOTable(list){
 
     group.rows.forEach(po => {
       const tr = document.createElement('tr');
-      const statusClass = po['Status']==='menunggu harga' ? 'status-wait' : (po['Status']==='harga terisi' ? 'status-filled' : 'status-other');
+      const statusDotClass = po['Status']==='menunggu harga' ? 'wait' : (po['Status']==='harga terisi' ? 'filled' : 'other');
       const priceCell = canFillPrice
-        ? `<input class="price-input mono" type="number" value="${po['Unit Price']||''}" placeholder="isi harga" data-id="${po['ID']}">`
+        ? `<input class="price-input mono" type="number" value="${po['Unit Price']||''}" placeholder="isi" data-id="${po['ID']}">`
         : `<span class="num">${po['Unit Price'] ? fmtRupiah(po['Unit Price']) : '-'}</span>`;
       const modalCells = canSeeModal ? `
         <td data-label="Modal/Unit" class="right">${canEditModal
           ? `<input class="price-input mono modal-input" type="number" value="${po['Modal Per Unit']||''}" placeholder="modal" data-id="${po['ID']}">`
           : `<span class="num">${po['Modal Per Unit'] ? fmtRupiah(po['Modal Per Unit']) : '-'}</span>`}</td>
         <td data-label="Total Modal" class="right num">${po['Total Modal'] ? fmtRupiah(po['Total Modal']) : '-'}</td>` : '';
-      const deleteCell = canDelete ? `<td data-label=""><button class="btn btn-ghost btn-sm delete-po-btn" data-id="${po['ID']}">Hapus</button></td>` : '';
+      const deleteCell = canDelete ? `<td data-label=""><button class="btn btn-ghost btn-sm delete-po-btn" data-id="${po['ID']}" title="Hapus">✕</button></td>` : '';
       tr.innerHTML = `
-        <td data-label="ID" class="mono">${po['ID']}</td>
-        <td data-label="Item">${po['Item']}</td>
+        <td data-label="Item" title="${po['Item']} — ${po['Status']}"><span class="status-dot ${statusDotClass}"></span><span class="po-item-name">${po['Item']}</span></td>
         <td data-label="Qty" class="right num">${po['Qty']}</td>
-        <td data-label="Unit">${po['Unit']}</td>
+        <td data-label="Satuan">${po['Unit']}</td>
         <td data-label="Harga Satuan" class="right">${priceCell}</td>
-        <td data-label="Total Belanja" class="right num">${po['Total Belanja'] ? fmtRupiah(po['Total Belanja']) : '-'}</td>
+        <td data-label="Jumlah" class="right num">${po['Total Belanja'] ? fmtRupiah(po['Total Belanja']) : '-'}</td>
         ${modalCells}
-        <td data-label="Status"><span class="status-pill ${statusClass}">${po['Status']}</span></td>
         ${deleteCell}
       `;
       tb.appendChild(tr);
