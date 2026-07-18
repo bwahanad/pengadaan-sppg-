@@ -277,8 +277,26 @@
         <div class="row">
           <div class="field" style="flex:2;"><label>Nama Item</label><input type="text" id="itemNama" placeholder="mis. Beras"></div>
           <div class="field"><label>Satuan</label><input type="text" id="itemSatuan" placeholder="kg / pcs / dus"></div>
-          <div class="field"><label>Group</label><input type="text" id="itemGroup"></div>
-          <div class="field"><label>Kategori</label><input type="text" id="itemKategori" value="bahan baku"></div>
+          <div class="field">
+            <label>Group</label>
+            <select id="itemGroup">
+              <option value="">Pilih Group</option>
+              <option value="Karbo">Karbo</option>
+              <option value="Protein Hewani">Protein Hewani</option>
+              <option value="Protein Nabati">Protein Nabati</option>
+              <option value="Sayur">Sayur</option>
+              <option value="Buah">Buah</option>
+              <option value="Bumbu">Bumbu</option>
+              <option value="Susu">Susu</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Kategori</label>
+            <select id="itemKategori">
+              <option value="bahan baku">Bahan Baku</option>
+              <option value="operasional">Operasional</option>
+            </select>
+          </div>
           <div class="field"><label>Porsi per Unit</label><input type="number" id="itemPorsi"></div>
         </div>
         <div style="margin-top:14px;"><button class="btn btn-primary" id="saveItemBtn">Simpan Item</button></div>
