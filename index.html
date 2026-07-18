@@ -137,14 +137,14 @@
     tbody td::before{content:attr(data-label); font-size:10px; text-transform:uppercase; color:var(--ink-soft); font-weight:600;}
 
     /* Tabel PO tetap horizontal & kompak (tidak jadi kartu bertumpuk), supaya >=5 baris item kelihatan tanpa scroll */
-    .po-table thead{display:table-header-group;}
-    .po-table thead th{font-size:9px; padding:4px 3px;}
-    .po-table tbody tr.po-date-group{display:table-row; border-bottom:none;}
-    .po-table tbody tr:not(.po-date-group){display:table-row; padding:0;}
-    .po-table tbody td{display:table-cell; padding:6px 3px; font-size:11.5px; vertical-align:middle;}
-    .po-table tbody td::before{content:none;}
-    .po-table .price-input{width:64px; padding:5px 4px; font-size:11.5px;}
-    .po-table .po-item-name{max-width:78px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:middle;}
+    .compact-table thead{display:table-header-group;}
+    .compact-table thead th{font-size:9px; padding:4px 3px;}
+    .compact-table tbody tr.po-date-group{display:table-row; border-bottom:none;}
+    .compact-table tbody tr:not(.po-date-group){display:table-row; padding:0;}
+    .compact-table tbody td{display:table-cell; padding:6px 3px; font-size:11.5px; vertical-align:middle;}
+    .compact-table tbody td::before{content:none;}
+    .compact-table .price-input{width:64px; padding:5px 4px; font-size:11.5px;}
+    .compact-table .po-item-name{max-width:78px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:middle;}
   }
 </style>
 </head>
@@ -288,12 +288,7 @@
 
       <div class="card">
         <h2>Daftar PO</h2>
-        <div class="row" style="margin-bottom:12px;">
-          <div class="field"><label>Dari</label><input type="date" id="poFrom"></div>
-          <div class="field"><label>Sampai</label><input type="date" id="poTo"></div>
-          <div class="field" style="flex:0;"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" id="poFilterBtn">Terapkan</button></div>
-        </div>
-        <div class="table-wrap"><table class="po-table">
+        <div class="table-wrap"><table class="compact-table">
           <thead><tr id="poTableHead"></tr></thead>
           <tbody id="poTableBody"></tbody>
         </table></div>
@@ -357,7 +352,7 @@
         <div class="summary-grid" id="lapSummary"></div>
       </div>
       <div class="card">
-        <div class="table-wrap"><table>
+        <div class="table-wrap"><table class="compact-table">
           <thead><tr id="lapTableHead"></tr></thead>
           <tbody id="lapTableBody"></tbody>
         </table></div>
@@ -743,13 +738,10 @@ async function loadPO(){
   try{ itemMasterCache = await api('getItems', {}); }catch(e){}
   if(canCreate && !document.getElementById('poFormRows').children.length) addPoRow();
 
-  const from = document.getElementById('poFrom').value;
-  const to = document.getElementById('poTo').value;
   let list = [];
-  try{ list = await api('getPO', { from, to }); }catch(e){ toast(e.message, true); return; }
+  try{ list = await api('getPO', {}); }catch(e){ toast(e.message, true); return; }
   renderPOTable(list);
 }
-document.getElementById('poFilterBtn').addEventListener('click', loadPO);
 
 function renderPOTable(list){
   const canFillPrice = ['admin','suplier'].includes(state.role);
@@ -1040,7 +1032,7 @@ async function loadLaporan(){
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td data-label="Tanggal">${fmtDate(r['Tanggal'])}</td>
-      <td data-label="Item">${r['Item']}</td>
+      <td data-label="Item"><span class="po-item-name">${r['Item']}</span></td>
       <td data-label="Qty" class="right num">${r['Qty']}</td>
       <td data-label="Total Belanja" class="right num">${fmtRupiah(r['Total Belanja'])}</td>
       ${canSeeModal ? `
