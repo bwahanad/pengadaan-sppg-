@@ -210,24 +210,26 @@
         <div class="row">
           <div class="field"><label>Mulai</label><input type="date" id="pmMulai"></div>
           <div class="field"><label>Sampai</label><input type="date" id="pmSampai"></div>
-          <div class="field"><label>Kuota Belanja (Rp)</label><input type="number" id="pmKuota" placeholder="0"></div>
         </div>
         <div class="row" style="margin-top:10px;">
-          <div class="field"><label>Kecil — Sen</label><input type="number" id="pk_sen"></div>
-          <div class="field"><label>Kecil — Sel</label><input type="number" id="pk_sel"></div>
-          <div class="field"><label>Kecil — Rab</label><input type="number" id="pk_rab"></div>
-          <div class="field"><label>Kecil — Kam</label><input type="number" id="pk_kam"></div>
-          <div class="field"><label>Kecil — Jum</label><input type="number" id="pk_jum"></div>
-          <div class="field"><label>Kecil — Sab</label><input type="number" id="pk_sab"></div>
+          <div class="field"><label>Kecil — Sen</label><input type="number" class="pm-day-input" id="pk_sen"></div>
+          <div class="field"><label>Kecil — Sel</label><input type="number" class="pm-day-input" id="pk_sel"></div>
+          <div class="field"><label>Kecil — Rab</label><input type="number" class="pm-day-input" id="pk_rab"></div>
+          <div class="field"><label>Kecil — Kam</label><input type="number" class="pm-day-input" id="pk_kam"></div>
+          <div class="field"><label>Kecil — Jum</label><input type="number" class="pm-day-input" id="pk_jum"></div>
+          <div class="field"><label>Kecil — Sab</label><input type="number" class="pm-day-input" id="pk_sab"></div>
         </div>
         <div class="row" style="margin-top:6px;">
-          <div class="field"><label>Besar — Sen</label><input type="number" id="pb_sen"></div>
-          <div class="field"><label>Besar — Sel</label><input type="number" id="pb_sel"></div>
-          <div class="field"><label>Besar — Rab</label><input type="number" id="pb_rab"></div>
-          <div class="field"><label>Besar — Kam</label><input type="number" id="pb_kam"></div>
-          <div class="field"><label>Besar — Jum</label><input type="number" id="pb_jum"></div>
-          <div class="field"><label>Besar — Sab</label><input type="number" id="pb_sab"></div>
+          <div class="field"><label>Besar — Sen</label><input type="number" class="pm-day-input" id="pb_sen"></div>
+          <div class="field"><label>Besar — Sel</label><input type="number" class="pm-day-input" id="pb_sel"></div>
+          <div class="field"><label>Besar — Rab</label><input type="number" class="pm-day-input" id="pb_rab"></div>
+          <div class="field"><label>Besar — Kam</label><input type="number" class="pm-day-input" id="pb_kam"></div>
+          <div class="field"><label>Besar — Jum</label><input type="number" class="pm-day-input" id="pb_jum"></div>
+          <div class="field"><label>Besar — Sab</label><input type="number" class="pm-day-input" id="pb_sab"></div>
         </div>
+        <p style="font-size:13px; color:var(--ink-soft); margin:10px 0 0;">
+          Kuota Belanja (otomatis): <span class="mono" id="pmKuotaPreview" style="font-weight:600; color:var(--ink);">Rp0</span>
+        </p>
         <div style="margin-top:14px;"><button class="btn btn-primary" id="savePmBtn">Simpan PM</button></div>
       </div>
 
@@ -623,7 +625,6 @@ document.getElementById('savePmBtn').addEventListener('click', async () => {
   const data = {
     'Mulai': document.getElementById('pmMulai').value,
     'Sampai': document.getElementById('pmSampai').value,
-    'Kuota Belanja': Number(document.getElementById('pmKuota').value)||0,
   };
   HARI.forEach(h => {
     data['PM kecil '+HARI_LABEL[h]] = Number(document.getElementById('pk_'+h).value)||0;
@@ -633,6 +634,17 @@ document.getElementById('savePmBtn').addEventListener('click', async () => {
   try{ await api('createPM', {data}); toast('PM tersimpan'); loadPM(); }
   catch(e){ toast(e.message, true); }
 });
+
+function updatePmKuotaPreview(){
+  // Pratinjau di sisi klien saja (Rp8.000/porsi kecil, Rp10.000/porsi besar) -- nilai final dihitung ulang di server.
+  let total = 0;
+  HARI.forEach(h => {
+    total += (Number(document.getElementById('pk_'+h).value)||0) * 8000;
+    total += (Number(document.getElementById('pb_'+h).value)||0) * 10000;
+  });
+  document.getElementById('pmKuotaPreview').textContent = fmtRupiah(total);
+}
+document.querySelectorAll('.pm-day-input').forEach(inp => inp.addEventListener('input', updatePmKuotaPreview));
 
 /* ---------------- PO ---------------- */
 let itemMasterCache = [];
