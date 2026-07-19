@@ -1671,6 +1671,10 @@ function generateInvoicePdf(d){
   const marginL = 20, marginR = 20;
   let y = 22;
 
+  // Lebar kolom tabel (dipakai juga untuk menyelaraskan Nomor Surat/Hal ke border kiri kolom Satuan)
+  const COL_NO = 12, COL_SATUAN = 22, COL_HARGA = 32, COL_JUMLAH = 32;
+  const satuanLeftX = (pageWidth - marginR) - (COL_SATUAN + COL_HARGA + COL_JUMLAH);
+
   doc.setFont('helvetica','normal');
   doc.setFontSize(11);
 
@@ -1679,9 +1683,9 @@ function generateInvoicePdf(d){
   doc.text('Kepala SPPG', marginL, y+6);
   doc.text(d.namaDapur, marginL, y+12);
 
-  // Header kanan: nomor surat & hal
-  doc.text('Nomor Surat : ' + d.nomorSurat, pageWidth - marginR, y, { align:'right' });
-  doc.text('Hal : Tagihan Bahan Baku periode ' + d.tanggalLabel, pageWidth - marginR, y+6, { align:'right' });
+  // Header kanan: nomor surat & hal -- rata kanan, sejajar border kiri kolom Satuan
+  doc.text('Nomor Surat : ' + d.nomorSurat, satuanLeftX, y, { align:'right' });
+  doc.text('Hal : Tagihan Bahan Baku periode ' + d.tanggalLabel, satuanLeftX, y+6, { align:'right' });
 
   y += 26;
 
@@ -1704,11 +1708,11 @@ function generateInvoicePdf(d){
     headStyles: { fillColor: [47,74,52], textColor: 255, fontStyle: 'bold' },
     footStyles: { fillColor: [240,241,236], textColor: [30,42,32], fontStyle: 'bold' },
     columnStyles: {
-      0: { cellWidth: 12, halign:'center' },
+      0: { cellWidth: COL_NO, halign:'center' },
       1: { cellWidth: 'auto' },
-      2: { cellWidth: 22, halign:'center' },
-      3: { cellWidth: 32, halign:'right' },
-      4: { cellWidth: 32, halign:'right' }
+      2: { cellWidth: COL_SATUAN, halign:'center' },
+      3: { cellWidth: COL_HARGA, halign:'right' },
+      4: { cellWidth: COL_JUMLAH, halign:'right' }
     },
     margin: { left: marginL, right: marginR }
   });
@@ -1717,16 +1721,18 @@ function generateInvoicePdf(d){
   const pageHeight = doc.internal.pageSize.getHeight();
   if(closingY > pageHeight - 55){ doc.addPage(); closingY = 25; }
 
-  doc.text(d.kota + ', ' + d.tanggalLabel, pageWidth - marginR, closingY, { align:'right' });
-  doc.text('Hormat kami,', pageWidth - marginR, closingY+6, { align:'right' });
-  doc.text(d.namaUD, pageWidth - marginR, closingY+12, { align:'right' });
+  // Penutup -- blok diposisikan di sisi kanan halaman, tapi teksnya rata KIRI (bukan rata kanan per baris)
+  const closingX = pageWidth - marginR - 70; // lebar blok ~70mm, cukup untuk baris terpanjang
+  doc.text(d.kota + ', ' + d.tanggalLabel, closingX, closingY);
+  doc.text('Hormat kami,', closingX, closingY+6);
+  doc.text(d.namaUD, closingX, closingY+12);
 
-  const signY = closingY + 30;
+  const signY = closingY + 30; // kosong ~2-3 baris untuk tanda tangan
   const namaSigner = d.namaPemilikUD || '________________';
-  doc.text(namaSigner, pageWidth - marginR, signY, { align:'right' });
+  doc.text(namaSigner, closingX, signY);
   const signerWidth = doc.getTextWidth(namaSigner);
-  doc.line(pageWidth - marginR - signerWidth, signY+1.5, pageWidth - marginR, signY+1.5);
-  doc.text(d.posisi || '', pageWidth - marginR, signY+6, { align:'right' });
+  doc.line(closingX, signY+1.5, closingX+signerWidth, signY+1.5); // garis sepanjang nama
+  doc.text(d.posisi || '', closingX, signY+6);
 
   const filename = 'Invoice_' + (d.nomorSurat||'DO').replace(/[^a-zA-Z0-9]/g,'_') + '.pdf';
   doc.save(filename);
