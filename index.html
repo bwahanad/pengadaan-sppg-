@@ -33,7 +33,7 @@
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
-  body{background:var(--bg); color:var(--ink); font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh;}
+  body{background:var(--bg); color:var(--ink); font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh; font-size:16px;}
   h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif; letter-spacing:-0.01em;}
   .mono{font-family:'JetBrains Mono',monospace;}
   button{font-family:inherit;}
@@ -45,105 +45,121 @@
                 radial-gradient(circle at 85% 90%, rgba(47,74,52,.12), transparent 45%), var(--bg);
   }
   .center-card{background:var(--paper); border-radius:20px; box-shadow:var(--shadow); padding:36px 30px; max-width:420px; width:100%; text-align:center; border-top:6px solid var(--leaf);}
-  .login-mark{width:56px;height:56px;border-radius:50%; background:conic-gradient(from 45deg, var(--leaf), var(--turmeric), var(--leaf)); margin:0 auto 18px; display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Space Grotesk'; font-weight:700; font-size:20px;}
-  .center-card h1{font-size:22px; margin:0 0 4px;}
-  .center-card p{color:var(--ink-soft); font-size:14px; margin:0 0 26px;}
+  .login-mark{width:56px;height:56px;border-radius:50%; background:conic-gradient(from 45deg, var(--leaf), var(--turmeric), var(--leaf)); margin:0 auto 18px; display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Space Grotesk'; font-weight:700; font-size:22px;}
+  .center-card h1{font-size:26px; margin:0 0 4px;}
+  .center-card p{color:var(--ink-soft); font-size:16px; margin:0 0 26px;}
   #gsiBtn{display:flex; justify-content:center;}
-  .errtext{color:var(--danger); font-size:13px; margin-top:14px; min-height:16px;}
+  .errtext{color:var(--danger); font-size:15px; margin-top:14px; min-height:16px;}
 
   .sppg-list{display:flex; flex-direction:column; gap:8px; text-align:left; margin-bottom:6px;}
   .sppg-option{border:1px solid var(--line); border-radius:12px; padding:12px 14px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:#FBFBF8;}
   .sppg-option:hover{border-color:var(--turmeric); background:#FFF9EE;}
-  .sppg-option .nm{font-weight:600; font-size:14px;}
-  .sppg-option .rl{font-size:11px; color:var(--ink-soft); text-transform:capitalize;}
+  .sppg-option .nm{font-weight:600; font-size:16px;}
+  .sppg-option .rl{font-size:13px; color:var(--ink-soft); text-transform:capitalize;}
 
   /* ===== App shell ===== */
   #app{display:none; min-height:100vh; flex-direction:column;}
   header.topbar{background:var(--leaf); color:#fff; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:20; flex-wrap:wrap; gap:8px;}
   .brand{display:flex; align-items:center; gap:10px;}
-  .brand-mark{width:30px;height:30px;border-radius:8px;background:var(--turmeric); display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk';font-weight:700;color:var(--leaf-dark);font-size:14px;}
-  .brand-text .name{font-family:'Space Grotesk';font-weight:600;font-size:15px;line-height:1.1;}
-  .brand-text .sub{font-size:11px;opacity:.75;}
-  .userchip{display:flex;align-items:center;gap:8px;font-size:12px; flex-wrap:wrap;}
-  .role-badge{background:rgba(255,255,255,.18); padding:3px 9px; border-radius:20px; font-size:11px; text-transform:capitalize;}
-  .switch-btn,#logoutBtn{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;}
+  .brand-mark{width:30px;height:30px;border-radius:8px;background:var(--turmeric); display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk';font-weight:700;color:var(--leaf-dark);font-size:15px;}
+  .brand-text .name{font-family:'Space Grotesk';font-weight:600;font-size:17px;line-height:1.15;}
+  .brand-text .sub{font-size:13px;opacity:.85;}
+  .userchip{display:flex;align-items:center;gap:8px;font-size:14px; flex-wrap:wrap;}
+  .role-badge{background:rgba(255,255,255,.18); padding:3px 9px; border-radius:20px; font-size:13px; text-transform:capitalize;}
+  .switch-btn,#logoutBtn{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:6px 11px;font-size:14px;cursor:pointer;}
 
   nav.tabs{display:flex; gap:2px; background:var(--leaf-dark); overflow-x:auto; padding:0 10px; position:sticky; top:56px; z-index:19;}
-  nav.tabs button{background:transparent; border:none; color:rgba(255,255,255,.65); padding:12px 14px; font-size:13px; font-weight:600; cursor:pointer; border-bottom:3px solid transparent; white-space:nowrap;}
+  nav.tabs button{background:transparent; border:none; color:rgba(255,255,255,.65); padding:13px 15px; font-size:15px; font-weight:600; cursor:pointer; border-bottom:3px solid transparent; white-space:nowrap;}
   nav.tabs button.active{color:#fff; border-bottom-color:var(--turmeric);}
 
   main{flex:1; padding:18px; max-width:980px; margin:0 auto; width:100%;}
   .view{display:none;} .view.active{display:block;}
 
   .card{background:var(--paper); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px; margin-bottom:16px; border:1px solid var(--line);}
-  .card h2{font-size:16px; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
-  .card h2 .tag{font-size:10px; background:var(--turmeric); color:var(--leaf-dark); padding:2px 7px; border-radius:6px; font-family:'JetBrains Mono';}
+  .card h2{font-size:19px; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+  .card h2 .tag{font-size:12px; background:var(--turmeric); color:var(--leaf-dark); padding:2px 8px; border-radius:6px; font-family:'JetBrains Mono';}
 
   .row{display:flex; gap:10px; flex-wrap:wrap; align-items:end;}
   .field{display:flex; flex-direction:column; gap:5px; flex:1; min-width:130px;}
-  .field label{font-size:11px; color:var(--ink-soft); font-weight:600; text-transform:uppercase; letter-spacing:.03em;}
-  input,select{border:1px solid var(--line); border-radius:9px; padding:9px 10px; font-size:14px; background:#FBFBF8; color:var(--ink); font-family:inherit;}
+  .field label{font-size:13px; color:var(--ink-soft); font-weight:600; text-transform:uppercase; letter-spacing:.03em;}
+  input,select{border:1px solid var(--line); border-radius:9px; padding:10px 11px; font-size:16px; background:#FBFBF8; color:var(--ink); font-family:inherit;}
   input:focus,select:focus{outline:2px solid var(--turmeric); outline-offset:1px; border-color:var(--turmeric);}
   input:disabled{background:#F0F1EC; color:var(--ink-soft);}
 
-  .btn{border:none; border-radius:9px; padding:10px 16px; font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px;}
+  .btn{border:none; border-radius:9px; padding:11px 17px; font-size:15px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px;}
   .btn-primary{background:var(--leaf); color:#fff;} .btn-primary:hover{background:var(--leaf-dark);}
   .btn:disabled{opacity:.5; cursor:not-allowed; pointer-events:none;}
   .btn-accent{background:var(--turmeric); color:var(--leaf-dark);} .btn-accent:hover{background:var(--turmeric-dark); color:#fff;}
   .btn-ghost{background:transparent; border:1px solid var(--line); color:var(--ink);}
-  .btn-sm{padding:6px 10px; font-size:12px; border-radius:7px;}
+  .btn-sm{padding:7px 12px; font-size:14px; border-radius:7px;}
 
-  table{width:100%; border-collapse:collapse; font-size:13px;}
-  thead th{text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); border-bottom:2px solid var(--line); padding:8px 8px;}
-  tbody td{padding:9px 8px; border-bottom:1px dashed var(--line); vertical-align:middle;}
+  table{width:100%; border-collapse:collapse; font-size:15px;}
+  thead th{text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); border-bottom:2px solid var(--line); padding:9px 8px;}
+  tbody td{padding:10px 8px; border-bottom:1px dashed var(--line); vertical-align:middle;}
   tbody tr:hover{background:#FAFAF5;}
   .num{font-family:'JetBrains Mono'; font-variant-numeric:tabular-nums;}
   .right{text-align:right;}
 
-  .status-pill{padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; display:inline-block;}
+  .status-pill{padding:3px 10px; border-radius:20px; font-size:13px; font-weight:600; display:inline-block;}
   .status-wait{background:#FBEFD9; color:var(--wait);}
   .status-filled{background:#E4F0E6; color:var(--ok);}
   .status-other{background:#F0F1EC; color:var(--ink-soft);}
 
-  .status-dot{width:7px; height:7px; border-radius:50%; display:inline-block; margin-right:5px; flex-shrink:0;}
+  .status-dot{width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; flex-shrink:0;}
   .status-dot.wait{background:var(--wait);}
   .status-dot.filled{background:var(--ok);}
   .status-dot.other{background:var(--ink-soft);}
-  .helptext{font-size:12px; color:var(--ink-soft);}
+  .helptext{font-size:14px; color:var(--ink-soft);}
 
-  .wa-item-row{display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px dashed var(--line);}
+  .wa-item-row{display:flex; align-items:center; gap:10px; padding:9px 4px; border-bottom:1px dashed var(--line);}
   .wa-item-row:last-child{border-bottom:none;}
   .wa-check{
-    width:20px; height:20px; border-radius:5px; border:2px solid var(--line); flex-shrink:0;
-    display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; color:#fff;
+    width:24px; height:24px; border-radius:6px; border:2px solid var(--line); flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:15px; color:#fff;
     transition:background .15s, border-color .15s;
   }
   .wa-check.sent{background:#B9BFB6; border-color:#B9BFB6;}
   .wa-check.selected{background:var(--leaf-dark); border-color:var(--leaf-dark);}
   .wa-item-info{flex:1; min-width:0;}
-  .wa-item-info .nm{font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .wa-item-info .meta{font-size:11px; color:var(--ink-soft);}
+  .wa-item-info .nm{font-size:15px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .wa-item-info .meta{font-size:13px; color:var(--ink-soft);}
   .wa-item-row.was-sent .wa-item-info .nm{color:var(--ink-soft);}
 
   tr.po-date-group td{
-    background:var(--leaf); color:#fff; font-weight:600; padding:9px 10px;
+    background:var(--leaf); color:#fff; font-weight:600; padding:10px 10px;
     border-bottom:none; display:table-cell;
   }
-  tr.po-date-group .po-date-group-date{font-size:12px;}
-  tr.po-date-group .po-date-group-total{float:right; font-family:'JetBrains Mono'; font-size:12px;}
+  tr.po-date-group .po-date-group-date{font-size:14px;}
+  tr.po-date-group .po-date-group-total{float:right; font-family:'JetBrains Mono'; font-size:14px;}
   tr.po-date-group:first-child td{border-top-left-radius:8px; border-top-right-radius:8px;}
 
   .price-input{width:110px;}
+
+  .card-head{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:14px;}
+  .card-head h2{margin:0;}
+  .refresh-btn{
+    background:transparent; border:1px solid var(--line); color:var(--ink-soft); cursor:pointer;
+    width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:16px; flex-shrink:0; transition:background .15s, color .15s;
+  }
+  .refresh-btn:hover{background:#F0F1EC; color:var(--ink);}
+  .refresh-btn.spinning{animation:refresh-spin .6s linear;}
+  @keyframes refresh-spin{ from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+
+  .po-editable-row{cursor:pointer;}
+  .po-editable-row:hover{background:#FAF6EC;}
+  .tap-value{font-family:'JetBrains Mono'; font-variant-numeric:tabular-nums; border-bottom:1.5px dashed var(--turmeric-dark); padding-bottom:1px;}
+  .tap-value-empty{color:var(--wait); font-family:'Inter'; font-style:italic; border-bottom:1.5px dashed var(--wait);}
   .table-wrap{overflow-x:auto; border-radius:10px;}
-  .empty{padding:30px; text-align:center; color:var(--ink-soft); font-size:13px;}
+  .empty{padding:30px; text-align:center; color:var(--ink-soft); font-size:15px;}
 
   .summary-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-top:8px;}
   .summary-item{background:#F6F7F1; border-radius:10px; padding:12px; border:1px solid var(--line);}
-  .summary-item .label{font-size:10px; text-transform:uppercase; color:var(--ink-soft); letter-spacing:.03em;}
-  .summary-item .value{font-family:'JetBrains Mono'; font-weight:600; font-size:16px; margin-top:3px;}
+  .summary-item .label{font-size:12px; text-transform:uppercase; color:var(--ink-soft); letter-spacing:.03em;}
+  .summary-item .value{font-family:'JetBrains Mono'; font-weight:600; font-size:19px; margin-top:3px;}
   .summary-item.pos .value{color:var(--ok);} .summary-item.neg .value{color:var(--danger);}
 
-  .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--leaf-dark); color:#fff; padding:11px 18px; border-radius:10px; font-size:13px; box-shadow:var(--shadow); z-index:99; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s;}
+  .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--leaf-dark); color:#fff; padding:12px 19px; border-radius:10px; font-size:15px; box-shadow:var(--shadow); z-index:99; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s;}
   .toast.show{opacity:1; transform:translateX(-50%) translateY(-6px);}
   .toast.err{background:var(--danger);}
 
@@ -155,7 +171,7 @@
   }
   .confirm-overlay.show{display:flex;}
   .confirm-box{background:var(--paper); border-radius:16px; padding:22px; max-width:340px; width:100%; box-shadow:var(--shadow); text-align:center;}
-  .confirm-box p{font-size:14px; margin:0 0 18px; color:var(--ink); white-space:pre-line;}
+  .confirm-box p{font-size:16px; margin:0 0 18px; color:var(--ink); white-space:pre-line;}
   .confirm-actions{display:flex; gap:10px; justify-content:center;}
   .confirm-actions .btn{flex:1;}
 
@@ -163,18 +179,18 @@
     main{padding:12px;} .card{padding:14px;}
     thead{display:none;}
     tbody tr{display:block; border-bottom:2px solid var(--line); padding:8px 0;}
-    tbody td{display:flex; justify-content:space-between; border-bottom:none; padding:5px 4px;}
-    tbody td::before{content:attr(data-label); font-size:10px; text-transform:uppercase; color:var(--ink-soft); font-weight:600;}
+    tbody td{display:flex; justify-content:space-between; border-bottom:none; padding:6px 4px;}
+    tbody td::before{content:attr(data-label); font-size:12px; text-transform:uppercase; color:var(--ink-soft); font-weight:600;}
 
-    /* Tabel PO tetap horizontal & kompak (tidak jadi kartu bertumpuk), supaya >=5 baris item kelihatan tanpa scroll */
+    /* Tabel PO tetap horizontal & kompak (tidak jadi kartu bertumpuk), tetap diusahakan beberapa baris kelihatan tanpa scroll */
     .compact-table thead{display:table-header-group;}
-    .compact-table thead th{font-size:9px; padding:4px 3px;}
+    .compact-table thead th{font-size:11px; padding:5px 3px;}
     .compact-table tbody tr.po-date-group{display:table-row; border-bottom:none;}
     .compact-table tbody tr:not(.po-date-group){display:table-row; padding:0;}
-    .compact-table tbody td{display:table-cell; padding:6px 3px; font-size:11.5px; vertical-align:middle;}
+    .compact-table tbody td{display:table-cell; padding:7px 3px; font-size:13.5px; vertical-align:middle;}
     .compact-table tbody td::before{content:none;}
-    .compact-table .price-input{width:64px; padding:5px 4px; font-size:11.5px;}
-    .compact-table .po-item-name{max-width:78px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:middle;}
+    .compact-table .price-input{width:70px; padding:5px 4px; font-size:13.5px;}
+    .compact-table .po-item-name{max-width:72px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:middle;}
   }
 </style>
 </head>
@@ -252,7 +268,7 @@
     </div>
     <div style="margin-top:14px;"><button class="btn btn-primary" id="submitRegisterBtn" style="width:100%; justify-content:center;">Daftarkan</button></div>
     <div class="errtext" id="registerError"></div>
-    <div id="registerSuccess" style="display:none; text-align:left; font-size:13px; background:#F6F7F1; border-radius:10px; padding:12px; margin-top:14px; line-height:1.5;"></div>
+    <div id="registerSuccess" style="display:none; text-align:left; font-size:15px; background:#F6F7F1; border-radius:10px; padding:12px; margin-top:14px; line-height:1.5;"></div>
   </div>
 </div>
 
@@ -301,14 +317,17 @@
           <div class="field"><label>Kecil — Sab</label><input type="number" class="pm-day-input" id="pk_sab"></div>
           <div class="field"><label>Besar — Sab</label><input type="number" class="pm-day-input" id="pb_sab"></div>
         </div>
-        <p style="font-size:13px; color:var(--ink-soft); margin:10px 0 0;">
+        <p style="font-size:15px; color:var(--ink-soft); margin:10px 0 0;">
           Kuota Belanja (otomatis): <span class="mono" id="pmKuotaPreview" style="font-weight:600; color:var(--ink);">Rp0</span>
         </p>
         <div style="margin-top:14px;"><button class="btn btn-primary" id="savePmBtn">Simpan PM</button></div>
       </div>
 
       <div class="card">
-        <h2>Daftar PM</h2>
+        <div class="card-head">
+          <h2>Daftar PM</h2>
+          <button class="refresh-btn" onclick="refreshView(this, loadPM)" title="Refresh">↻</button>
+        </div>
         <div class="table-wrap"><table>
           <thead><tr><th>ID PM</th><th>Periode</th><th class="right">Kuota</th><th class="right">Realisasi</th><th class="right">Selisih</th></tr></thead>
           <tbody id="pmTableBody"></tbody>
@@ -333,6 +352,7 @@
             <button class="btn btn-ghost btn-sm" id="openInvoiceBtn" style="display:none;">📄 Invoice PDF</button>
             <button class="btn btn-ghost btn-sm" id="openPrintDoBtn" style="display:none;">🖨 Print DO</button>
             <button class="btn btn-accent btn-sm" id="openWaSendBtn" style="display:none;">Kirim PO ke WA Suplier</button>
+            <button class="refresh-btn" onclick="refreshView(this, loadPO)" title="Refresh">↻</button>
           </div>
         </div>
         <div class="table-wrap"><table class="compact-table">
@@ -346,7 +366,7 @@
     <section class="view" id="view-item">
       <div class="card" id="itemFormCard" style="display:none;">
         <h2>Tambah / Edit Item <span class="tag">Data Deskriptif</span></h2>
-        <p style="font-size:12px; color:var(--ink-soft); margin-top:-6px;">
+        <p style="font-size:14px; color:var(--ink-soft); margin-top:-6px;">
           Untuk item yang sudah ada, ketik nama item persis sama untuk mengedit. Modal/harga pokok
           diisi terpisah oleh Suplier.
         </p>
@@ -382,7 +402,10 @@
       </div>
 
       <div class="card">
-        <h2>Daftar Item</h2>
+        <div class="card-head">
+          <h2>Daftar Item</h2>
+          <button class="refresh-btn" onclick="refreshView(this, loadItemMaster)" title="Refresh">↻</button>
+        </div>
         <div class="table-wrap"><table class="compact-table">
           <thead><tr id="itemTableHead"></tr></thead>
           <tbody id="itemTableBody"></tbody>
@@ -393,7 +416,10 @@
     <!-- ============ LAPORAN VIEW ============ -->
     <section class="view" id="view-laporan">
       <div class="card">
-        <h2>Laporan Belanja</h2>
+        <div class="card-head">
+          <h2>Laporan Belanja</h2>
+          <button class="refresh-btn" onclick="refreshView(this, loadLaporan)" title="Refresh">↻</button>
+        </div>
         <div class="row" style="margin-bottom:6px;">
           <div class="field"><label>Dari</label><input type="date" id="lapFrom"></div>
           <div class="field"><label>Sampai</label><input type="date" id="lapTo"></div>
@@ -412,8 +438,11 @@
     <!-- ============ SUPERADMIN: PERSETUJUAN SPPG ============ -->
     <section class="view" id="view-approval">
       <div class="card">
-        <h2>Persetujuan Pendaftaran Dapur Baru</h2>
-        <p style="font-size:13px; color:var(--ink-soft); margin-top:-6px;">
+        <div class="card-head">
+          <h2>Persetujuan Pendaftaran Dapur Baru</h2>
+          <button class="refresh-btn" onclick="refreshView(this, loadPendingSppg)" title="Refresh">↻</button>
+        </div>
+        <p style="font-size:15px; color:var(--ink-soft); margin-top:-6px;">
           Pastikan admin dapur sudah men-share spreadsheet-nya (akses Editor) ke email Admin Pusat sebelum di-approve.
         </p>
         <div class="table-wrap"><table>
@@ -426,7 +455,10 @@
     <!-- ============ ADMIN: USERS ============ -->
     <section class="view" id="view-users">
       <div class="card">
-        <h2>Kelola User <span class="tag" id="usersTag">SPPG Aktif</span></h2>
+        <div class="card-head">
+          <h2>Kelola User <span class="tag" id="usersTag">SPPG Aktif</span></h2>
+          <button class="refresh-btn" onclick="refreshView(this, loadUsers)" title="Refresh">↻</button>
+        </div>
         <p class="helptext" id="userFormMode" style="margin:-4px 0 8px;"></p>
         <div class="row item-row-form">
           <div class="field"><label>Email Google</label><input type="email" id="newUserEmail"></div>
@@ -479,9 +511,28 @@
   </div>
 </div>
 
+<div class="confirm-overlay" id="poPriceEditorOverlay">
+  <div class="confirm-box" style="max-width:360px; text-align:left;">
+    <h3 id="poPriceEditorItem" style="margin:0 0 2px; font-size:18px;">Nama Item</h3>
+    <p id="poPriceEditorMeta" class="helptext" style="margin:0 0 16px;">Qty · Satuan · Tanggal</p>
+    <div class="field" style="margin-bottom:12px;">
+      <label>Harga Satuan (Rp)</label>
+      <input type="number" id="poPriceEditorHarga" placeholder="0">
+    </div>
+    <div class="field" id="poPriceEditorModalField" style="margin-bottom:4px;">
+      <label>Modal / Unit (Rp)</label>
+      <input type="number" id="poPriceEditorModal" placeholder="0">
+    </div>
+    <div class="confirm-actions" style="margin-top:16px;">
+      <button class="btn btn-ghost btn-sm" id="poPriceEditorCancelBtn">Batal</button>
+      <button class="btn btn-primary btn-sm" id="poPriceEditorSaveBtn">Simpan</button>
+    </div>
+  </div>
+</div>
+
 <div class="confirm-overlay" id="waSendOverlay">
   <div class="confirm-box" style="max-width:400px; text-align:left;">
-    <h3 style="margin:0 0 12px; font-size:16px;">Kirim PO ke WA Suplier</h3>
+    <h3 style="margin:0 0 12px; font-size:18px;">Kirim PO ke WA Suplier</h3>
     <div class="field" style="margin-bottom:10px;">
       <label>Tanggal PO</label>
       <input type="date" id="waSendTanggal">
@@ -501,7 +552,7 @@
 
 <div class="confirm-overlay" id="printDoOverlay">
   <div class="confirm-box" style="max-width:420px; text-align:left;">
-    <h3 style="margin:0 0 12px; font-size:16px;">Print DO (Bluetooth 58mm)</h3>
+    <h3 style="margin:0 0 12px; font-size:18px;">Print DO (Bluetooth 58mm)</h3>
     <div class="field" style="margin-bottom:10px;">
       <label>Tanggal PO</label>
       <input type="date" id="printDoTanggal">
@@ -510,8 +561,8 @@
     <div id="printDoItemList" style="max-height:200px; overflow-y:auto; margin-top:10px;"></div>
 
     <div style="margin-top:12px;">
-      <div style="font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-soft); font-weight:600; margin-bottom:6px;">Preview Struk</div>
-      <pre id="printDoPreview" style="background:#fff; border:1px solid var(--line); border-radius:6px; padding:10px; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.5; white-space:pre; overflow-x:auto; color:#111; margin:0;">Pilih tanggal &amp; centang item untuk lihat preview.</pre>
+      <div style="font-size:13px; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-soft); font-weight:600; margin-bottom:6px;">Preview Struk</div>
+      <pre id="printDoPreview" style="background:#fff; border:1px solid var(--line); border-radius:6px; padding:10px; font-family:'JetBrains Mono',monospace; font-size:13px; line-height:1.5; white-space:pre; overflow-x:auto; color:#111; margin:0;">Pilih tanggal &amp; centang item untuk lihat preview.</pre>
     </div>
 
     <div class="confirm-actions" style="margin-top:16px;">
@@ -523,7 +574,7 @@
 
 <div class="confirm-overlay" id="invoiceOverlay">
   <div class="confirm-box" style="max-width:400px; text-align:left;">
-    <h3 style="margin:0 0 12px; font-size:16px;">Buat Invoice PDF</h3>
+    <h3 style="margin:0 0 12px; font-size:18px;">Buat Invoice PDF</h3>
     <div class="row" style="margin-bottom:8px;">
       <div class="field"><label>Tanggal Periode</label><input type="date" id="invoiceTanggal"></div>
       <div class="field"><label>Nomor Surat</label><input type="text" id="invoiceNomorSurat" placeholder="mis. 001/UD-BJ/VII/2026"></div>
@@ -542,7 +593,7 @@
 
 <div class="confirm-overlay" id="invoicePreviewOverlay">
   <div class="confirm-box" style="max-width:520px; width:94vw; text-align:left; padding:16px;">
-    <h3 style="margin:0 0 10px; font-size:16px;">Preview Invoice</h3>
+    <h3 style="margin:0 0 10px; font-size:18px;">Preview Invoice</h3>
     <div id="invoicePreviewCanvasWrap" style="width:100%; max-height:60vh; overflow-y:auto; border:1px solid var(--line); border-radius:8px; background:#EDEEE9; padding:8px; text-align:center;"></div>
     <div class="confirm-actions" style="margin-top:14px;">
       <button class="btn btn-ghost btn-sm" id="invoicePreviewBackBtn">← Kembali Edit</button>
@@ -570,6 +621,21 @@ function toast(msg, isErr){
   const t = document.getElementById('toast');
   t.textContent = msg; t.className = 'toast show' + (isErr?' err':'');
   setTimeout(()=> t.className='toast', 2600);
+}
+
+/** Dipakai tombol refresh (↻) di tiap fitur -- panggil ulang fungsi load-nya + kasih animasi & konfirmasi singkat. */
+async function refreshView(btn, loadFn){
+  btn.classList.add('spinning');
+  btn.disabled = true;
+  try{
+    await loadFn();
+    toast('Data diperbarui');
+  } catch(e){
+    toast(e.message || 'Gagal refresh', true);
+  } finally {
+    setTimeout(() => btn.classList.remove('spinning'), 600);
+    btn.disabled = false;
+  }
 }
 
 function showConfirm(message){
@@ -960,14 +1026,18 @@ async function loadPO(){
   document.getElementById('openWaSendBtn').style.display = canCreate ? 'inline-flex' : 'none';
   document.getElementById('openPrintDoBtn').style.display = canPrint ? 'inline-flex' : 'none';
   document.getElementById('openInvoiceBtn').style.display = canPrint ? 'inline-flex' : 'none';
-  itemMasterCache = [];
-  try{ itemMasterCache = await api('getItems', {}); }catch(e){}
+
+  // Ambil Item master & daftar PO SEKALIGUS (paralel), bukan bergantian -- lebih cepat
+  const [itemsResult, poResult] = await Promise.allSettled([
+    api('getItems', {}),
+    api('getPO', {})
+  ]);
+  itemMasterCache = itemsResult.status === 'fulfilled' ? itemsResult.value : [];
   if(canCreate && !document.getElementById('poFormRows').children.length) addPoRow();
 
-  let list = [];
-  try{ list = await api('getPO', {}); }catch(e){ toast(e.message, true); return; }
-  poListCache = list;
-  renderPOTable(list);
+  if(poResult.status !== 'fulfilled'){ toast(poResult.reason?.message || 'Gagal memuat PO', true); return; }
+  poListCache = poResult.value;
+  renderPOTable(poListCache);
 }
 
 function renderPOTable(list){
@@ -975,6 +1045,7 @@ function renderPOTable(list){
   const canSeeModal = ['admin','suplier','investor'].includes(state.role);
   const canEditModal = ['admin','suplier'].includes(state.role);
   const canDelete = ['admin','keuangan'].includes(state.role);
+  const canEditPO = canFillPrice; // suplier & admin -> klik baris buka popup isi harga & modal sekaligus
 
   const head = document.getElementById('poTableHead');
   head.innerHTML = `<th>Item</th><th class="right">Qty</th><th>Satuan</th>
@@ -1010,13 +1081,14 @@ function renderPOTable(list){
 
     group.rows.forEach(po => {
       const tr = document.createElement('tr');
+      if(canEditPO){ tr.className = 'po-editable-row'; tr.dataset.id = po['ID']; }
       const statusDotClass = po['Status']==='menunggu harga' ? 'wait' : (po['Status']==='harga terisi' ? 'filled' : 'other');
       const priceCell = canFillPrice
-        ? `<input class="price-input mono" type="number" value="${po['Unit Price']||''}" placeholder="isi" data-id="${po['ID']}">`
+        ? `<span class="tap-value ${po['Unit Price']?'':'tap-value-empty'}">${po['Unit Price'] ? fmtRupiah(po['Unit Price']) : 'Tap isi'}</span>`
         : `<span class="num">${po['Unit Price'] ? fmtRupiah(po['Unit Price']) : '-'}</span>`;
       const modalCells = canSeeModal ? `
         <td data-label="Modal/Unit" class="right">${canEditModal
-          ? `<input class="price-input mono modal-input" type="number" value="${po['Modal Per Unit']||''}" placeholder="modal" data-id="${po['ID']}">`
+          ? `<span class="tap-value ${po['Modal Per Unit']?'':'tap-value-empty'}">${po['Modal Per Unit'] ? fmtRupiah(po['Modal Per Unit']) : 'Tap isi'}</span>`
           : `<span class="num">${po['Modal Per Unit'] ? fmtRupiah(po['Modal Per Unit']) : '-'}</span>`}</td>
         <td data-label="Total Modal" class="right num">${po['Total Modal'] ? fmtRupiah(po['Total Modal']) : '-'}</td>` : '';
       const deleteCell = canDelete ? `<td data-label=""><button class="btn btn-ghost btn-sm delete-po-btn" data-id="${po['ID']}" title="Hapus">✕</button></td>` : '';
@@ -1033,25 +1105,15 @@ function renderPOTable(list){
     });
   });
 
-  if(canFillPrice){
-    tb.querySelectorAll('.price-input:not(.modal-input)').forEach(inp => {
-      inp.addEventListener('change', async () => {
-        try{ await api('updatePOPrice', { id: inp.dataset.id, unitPrice: Number(inp.value) }); toast('Harga tersimpan'); loadPO(); }
-        catch(e){ toast(e.message, true); }
-      });
-    });
-  }
-  if(canEditModal){
-    tb.querySelectorAll('.modal-input').forEach(inp => {
-      inp.addEventListener('change', async () => {
-        try{ await api('updatePOModal', { id: inp.dataset.id, modalPerUnit: Number(inp.value) }); toast('Modal tersimpan'); loadPO(); }
-        catch(e){ toast(e.message, true); }
-      });
+  if(canEditPO){
+    tb.querySelectorAll('.po-editable-row').forEach(row => {
+      row.addEventListener('click', () => openPoPriceEditor(row.dataset.id, list));
     });
   }
   if(canDelete){
     tb.querySelectorAll('.delete-po-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation(); // jangan sampai memicu buka popup edit harga juga
         if(!(await showConfirm('Hapus PO ini? Data yang dihapus tidak bisa dikembalikan.'))) return;
         try{ await api('deletePO', { id: btn.dataset.id }); toast('PO dihapus'); loadPO(); }
         catch(e){ toast(e.message, true); }
@@ -1059,6 +1121,51 @@ function renderPOTable(list){
     });
   }
 }
+
+/* ---------------- POPUP ISI HARGA SATUAN & MODAL/UNIT (Suplier/Admin) ---------------- */
+function openPoPriceEditor(id, list){
+  const po = list.find(r => String(r['ID']) === String(id));
+  if(!po) return;
+  const canEditModal = ['admin','suplier'].includes(state.role);
+
+  document.getElementById('poPriceEditorItem').textContent = po['Item'];
+  document.getElementById('poPriceEditorMeta').textContent = `${po['Qty']} ${po['Unit']} · ${fmtDate(po['Tanggal'])}`;
+  document.getElementById('poPriceEditorHarga').value = po['Unit Price'] || '';
+  document.getElementById('poPriceEditorModalField').style.display = canEditModal ? 'block' : 'none';
+  document.getElementById('poPriceEditorModal').value = po['Modal Per Unit'] || '';
+  document.getElementById('poPriceEditorOverlay').dataset.id = id;
+  document.getElementById('poPriceEditorOverlay').classList.add('show');
+  document.getElementById('poPriceEditorHarga').focus();
+}
+
+document.getElementById('poPriceEditorCancelBtn').addEventListener('click', () => {
+  document.getElementById('poPriceEditorOverlay').classList.remove('show');
+});
+
+document.getElementById('poPriceEditorSaveBtn').addEventListener('click', async () => {
+  const overlay = document.getElementById('poPriceEditorOverlay');
+  const id = overlay.dataset.id;
+  const harga = document.getElementById('poPriceEditorHarga').value;
+  const modal = document.getElementById('poPriceEditorModal').value;
+  const canEditModal = ['admin','suplier'].includes(state.role);
+
+  const btn = document.getElementById('poPriceEditorSaveBtn');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'Menyimpan...';
+  try{
+    if(harga !== '') await api('updatePOPrice', { id, unitPrice: Number(harga) });
+    if(canEditModal && modal !== '') await api('updatePOModal', { id, modalPerUnit: Number(modal) });
+    toast('Tersimpan');
+    overlay.classList.remove('show');
+    loadPO();
+  } catch(e){
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+});
 
 const GROUP_OPTIONS = ['Karbo','Protein Hewani','Protein Nabati','Sayur','Buah','Bumbu','Susu'];
 let lastPoTanggal = '';
@@ -1417,7 +1524,12 @@ document.getElementById('waSendConfirmBtn').addEventListener('click', async () =
 function isoDate(d){
   const dt = new Date(d);
   if(isNaN(dt)) return '';
-  return dt.toISOString().slice(0,10);
+  // PENTING: pakai komponen tanggal LOKAL (bukan toISOString yang UTC), supaya konsisten
+  // dengan fmtDate() dan tidak "mundur sehari" untuk pengguna di zona WIB (UTC+7).
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth()+1).padStart(2,'0');
+  const day = String(dt.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
 }
 
 /* ---------------- PRINT DO (BLUETOOTH THERMAL PRINTER) ---------------- */
