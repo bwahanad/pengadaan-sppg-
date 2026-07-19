@@ -23,6 +23,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
     --bg:#F6F7F1; --paper:#FFFFFF; --ink:#1E2A20; --ink-soft:#5C6B5E;
@@ -542,7 +543,7 @@
 <div class="confirm-overlay" id="invoicePreviewOverlay">
   <div class="confirm-box" style="max-width:520px; width:94vw; text-align:left; padding:16px;">
     <h3 style="margin:0 0 10px; font-size:16px;">Preview Invoice</h3>
-    <iframe id="invoicePreviewFrame" style="width:100%; height:60vh; border:1px solid var(--line); border-radius:8px; background:#fff;"></iframe>
+    <div id="invoicePreviewCanvasWrap" style="width:100%; max-height:60vh; overflow-y:auto; border:1px solid var(--line); border-radius:8px; background:#EDEEE9; padding:8px; text-align:center;"></div>
     <div class="confirm-actions" style="margin-top:14px;">
       <button class="btn btn-ghost btn-sm" id="invoicePreviewBackBtn">← Kembali Edit</button>
       <button class="btn btn-accent btn-sm" id="invoicePreviewDownloadBtn">Unduh PDF</button>
@@ -1643,7 +1644,36 @@ document.getElementById('invoiceCancelBtn').addEventListener('click', () => {
 });
 
 let currentInvoiceDoc = null;
-let currentInvoicePreviewUrl = null;
+
+// Setup worker pdf.js (dimuat lazy, cukup sekali)
+if(window.pdfjsLib){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+async function renderInvoicePreview(doc){
+  const wrap = document.getElementById('invoicePreviewCanvasWrap');
+  wrap.innerHTML = '<p class="helptext">Memuat preview...</p>';
+  if(!window.pdfjsLib){ wrap.innerHTML = '<p class="helptext">Library preview belum termuat, coba lagi sebentar.</p>'; return; }
+
+  const arrayBuffer = doc.output('arraybuffer');
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  wrap.innerHTML = '';
+  for(let i=1; i<=pdf.numPages; i++){
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({ scale: 1.6 });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    canvas.style.width = '100%';
+    canvas.style.maxWidth = '480px';
+    canvas.style.marginBottom = '8px';
+    canvas.style.boxShadow = '0 1px 6px rgba(0,0,0,.18)';
+    canvas.style.background = '#fff';
+    wrap.appendChild(canvas);
+    const ctx = canvas.getContext('2d');
+    await page.render({ canvasContext: ctx, viewport }).promise;
+  }
+}
 
 document.getElementById('invoiceConfirmBtn').addEventListener('click', async () => {
   const tanggal = document.getElementById('invoiceTanggal').value;
@@ -1678,12 +1708,9 @@ document.getElementById('invoiceConfirmBtn').addEventListener('click', async () 
   currentInvoiceDoc = buildInvoiceDoc(invoiceData);
   currentInvoiceDoc._filename = 'Invoice_' + (nomorSurat||'DO').replace(/[^a-zA-Z0-9]/g,'_') + '.pdf';
 
-  if(currentInvoicePreviewUrl) URL.revokeObjectURL(currentInvoicePreviewUrl);
-  currentInvoicePreviewUrl = currentInvoiceDoc.output('bloburl');
-  document.getElementById('invoicePreviewFrame').src = currentInvoicePreviewUrl;
-
   document.getElementById('invoiceOverlay').classList.remove('show');
   document.getElementById('invoicePreviewOverlay').classList.add('show');
+  renderInvoicePreview(currentInvoiceDoc);
 });
 
 document.getElementById('invoicePreviewBackBtn').addEventListener('click', () => {
