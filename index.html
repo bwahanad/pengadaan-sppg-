@@ -440,11 +440,28 @@
     <section class="view" id="view-approval">
       <div class="card">
         <div class="card-head">
+          <h2>Daftarkan Dapur Baru</h2>
+        </div>
+        <p style="font-size:15px; color:var(--ink-soft); margin-top:-6px;">
+          Khusus Superadmin — langsung aktif tanpa perlu approval (karena Andalah yang biasanya menyetujui).
+          Tim (Suplier/Keuangan/Monitoring) bisa ditambahkan belakangan lewat Kelola User.
+        </p>
+        <div class="row">
+          <div class="field"><label>Nama SPPG / Dapur</label><input type="text" id="saNamaSppg" placeholder="mis. SPPG Dapur Melati"></div>
+          <div class="field"><label>Link Google Sheet Dapur</label><input type="text" id="saLinkSppg" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
+          <div class="field" style="flex:0;"><label>&nbsp;</label><button class="btn btn-primary" id="saDaftarSppgBtn">Daftarkan</button></div>
+        </div>
+        <p id="saDaftarInfo" class="helptext" style="margin:8px 0 0;"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
           <h2>Persetujuan Pendaftaran Dapur Baru</h2>
           <button class="refresh-btn" onclick="refreshView(this, loadPendingSppg)" title="Refresh">↻</button>
         </div>
         <p style="font-size:15px; color:var(--ink-soft); margin-top:-6px;">
-          Pastikan admin dapur sudah men-share spreadsheet-nya (akses Editor) ke email Admin Pusat sebelum di-approve.
+          Ini untuk pendaftaran yang dimulai oleh <b>Suplier</b> sendiri lewat form "Daftar Dapur Baru" —
+          pastikan mereka sudah men-share spreadsheet-nya (akses Editor) ke email Admin Pusat sebelum di-approve.
         </p>
         <div class="table-wrap"><table>
           <thead><tr><th>Kode</th><th>Nama SPPG</th><th>Spreadsheet ID</th><th></th></tr></thead>
@@ -919,7 +936,7 @@ async function loadPendingSppg(){
       <td data-label=""><button class="btn btn-accent btn-sm approve-btn">Setujui</button> <button class="btn btn-ghost btn-sm reject-btn">Tolak</button></td>
     `;
     tr.querySelector('.approve-btn').addEventListener('click', async () => {
-      try{ await api('approveSppg', { targetSppgId: s.ID_SPPG, approve: true }); toast('SPPG disetujui'); loadPendingSppg(); }
+      try{ await api('approveSppg', { targetSppgId: s.ID_SPPG, approve: true }); toast('SPPG disetujui'); loadPendingSppg(); refreshSuperadminOptions(); }
       catch(e){ toast(e.message, true); }
     });
     tr.querySelector('.reject-btn').addEventListener('click', async () => {
@@ -929,6 +946,42 @@ async function loadPendingSppg(){
     tb.appendChild(tr);
   });
 }
+
+/** Setelah SPPG baru ditambah/disetujui, tarik ulang daftar SPPG supaya langsung muncul di "Ganti SPPG" tanpa perlu logout. */
+async function refreshSuperadminOptions(){
+  if(state.role !== 'superadmin') return;
+  try{
+    const freshList = await api('getSppgList', {});
+    state.options = [{ role:'superadmin', sppgId:null, sppgNama:'Admin Pusat (semua SPPG)' }]
+      .concat(freshList.map(s => ({ role:'admin', sppgId:s.ID_SPPG, sppgNama:s.Nama_SPPG })));
+  } catch(e){ /* diam saja, tidak fatal kalau gagal refresh daftar */ }
+}
+
+document.getElementById('saDaftarSppgBtn').addEventListener('click', async () => {
+  const namaSppg = document.getElementById('saNamaSppg').value.trim();
+  const link = document.getElementById('saLinkSppg').value.trim();
+  const info = document.getElementById('saDaftarInfo');
+  info.textContent = '';
+  if(!namaSppg || !link){ toast('Isi Nama SPPG dan link spreadsheet', true); return; }
+
+  const btn = document.getElementById('saDaftarSppgBtn');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'Memproses...';
+  try{
+    const result = await api('registerSppgBySuperadmin', { namaSppg, spreadsheetLink: link });
+    toast(`Dapur "${namaSppg}" berhasil didaftarkan (${result.sppgId})`);
+    document.getElementById('saNamaSppg').value = '';
+    document.getElementById('saLinkSppg').value = '';
+    info.textContent = `Kode: ${result.sppgId} — sudah aktif. Tambahkan tim (Suplier/Keuangan/Monitoring) lewat Kelola User, atau tap "Ganti SPPG" untuk langsung masuk ke dapur ini.`;
+    await refreshSuperadminOptions();
+  } catch(e){
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+});
 
 /* ---------------- PM ---------------- */
 let pmListCache = [];
