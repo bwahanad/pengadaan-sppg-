@@ -320,6 +320,7 @@
         <p style="font-size:15px; color:var(--ink-soft); margin:10px 0 0;">
           Kuota Belanja (otomatis): <span class="mono" id="pmKuotaPreview" style="font-weight:600; color:var(--ink);">Rp0</span>
         </p>
+        <p id="pmEditInfo" class="helptext" style="margin:6px 0 0; color:var(--turmeric-dark); font-weight:600;"></p>
         <div style="margin-top:14px;"><button class="btn btn-primary" id="savePmBtn">Simpan PM</button></div>
       </div>
 
@@ -923,14 +924,15 @@ async function loadPendingSppg(){
 
 /* ---------------- PM ---------------- */
 let pmListCache = [];
+let editingPmId = null; // ID PM yang sedang diedit (kalau tanggal yang dipilih persis sama dengan PM yang sudah ada)
 
 async function loadPM(){
   const canEdit = ['admin','keuangan'].includes(state.role);
   document.getElementById('pmFormCard').style.display = canEdit ? 'block' : 'none';
-  if(canEdit) restorePmFormDefaults();
   let list = [];
   try{ list = await api('getPM', {}); }catch(e){ toast(e.message, true); }
   pmListCache = list;
+  if(canEdit){ restorePmFormDefaults(); checkExistingPmForDates(); }
   const tb = document.getElementById('pmTableBody'); tb.innerHTML = '';
   if(!list.length){ tb.innerHTML = '<tr><td colspan="5" class="empty">Belum ada data PM</td></tr>'; }
   list.forEach(pm => {
@@ -958,6 +960,35 @@ function findOverlappingPm(mulai, sampai){
   });
 }
 
+/**
+ * Kalau tanggal Mulai/Sampai yang dipilih PERSIS SAMA dengan PM yang sudah ada, tarik otomatis
+ * nilai kecil/besar yang sudah tersimpan untuk periode itu (mode edit), bukan dibiarkan kosong.
+ */
+function checkExistingPmForDates(){
+  const mulai = document.getElementById('pmMulai').value;
+  const sampai = document.getElementById('pmSampai').value;
+  const info = document.getElementById('pmEditInfo');
+  if(!mulai || !sampai){ editingPmId = null; document.getElementById('savePmBtn').textContent = 'Simpan PM'; info.textContent = ''; return; }
+
+  const match = pmListCache.find(pm => isoDate(pm['Mulai']) === mulai && isoDate(pm['Sampai']) === sampai);
+  if(match){
+    editingPmId = match['ID PM'];
+    HARI.forEach(h => {
+      document.getElementById('pk_'+h).value = match['PM kecil '+HARI_LABEL[h]] || 0;
+      document.getElementById('pb_'+h).value = match['PM Besar '+HARI_LABEL[h]] || 0;
+    });
+    document.getElementById('savePmBtn').textContent = 'Update PM';
+    info.textContent = `Mengedit PM yang sudah ada untuk periode ini (${match['ID PM']})`;
+  } else {
+    editingPmId = null;
+    document.getElementById('savePmBtn').textContent = 'Simpan PM';
+    info.textContent = '';
+  }
+  updatePmKuotaPreview();
+}
+document.getElementById('pmMulai').addEventListener('change', checkExistingPmForDates);
+document.getElementById('pmSampai').addEventListener('change', checkExistingPmForDates);
+
 const PM_FIELD_IDS = ['pmMulai','pmSampai','pk_sen','pk_sel','pk_rab','pk_kam','pk_jum','pk_sab','pb_sen','pb_sel','pb_rab','pb_kam','pb_jum','pb_sab'];
 function pmDefaultsStorageKey(){ return 'pmFormDefaults_' + (state.sppgId || 'unknown'); }
 
@@ -983,10 +1014,12 @@ document.getElementById('savePmBtn').addEventListener('click', async () => {
   const sampai = document.getElementById('pmSampai').value;
   if(!mulai || !sampai){ toast('Isi tanggal Mulai & Sampai', true); return; }
 
-  const overlap = findOverlappingPm(mulai, sampai);
-  if(overlap){
-    await showAlert('Tanggal ini sudah dibuat PM pada periode sebelumnya\n(' + fmtDate(overlap['Mulai']) + ' – ' + fmtDate(overlap['Sampai']) + ')');
-    return;
+  if(!editingPmId){
+    const overlap = findOverlappingPm(mulai, sampai);
+    if(overlap){
+      await showAlert('Tanggal ini sudah dibuat PM pada periode sebelumnya\n(' + fmtDate(overlap['Mulai']) + ' – ' + fmtDate(overlap['Sampai']) + ')');
+      return;
+    }
   }
 
   const data = { 'Mulai': mulai, 'Sampai': sampai };
@@ -994,7 +1027,17 @@ document.getElementById('savePmBtn').addEventListener('click', async () => {
     data['PM kecil '+HARI_LABEL[h]] = Number(document.getElementById('pk_'+h).value)||0;
     data['PM Besar '+HARI_LABEL[h]] = Number(document.getElementById('pb_'+h).value)||0;
   });
-  try{ await api('createPM', {data}); toast('PM tersimpan'); savePmFormDefaults(); loadPM(); }
+  try{
+    if(editingPmId){
+      await api('updatePM', { id: editingPmId, data });
+      toast('PM diperbarui');
+    } else {
+      await api('createPM', {data});
+      toast('PM tersimpan');
+    }
+    savePmFormDefaults();
+    loadPM();
+  }
   catch(e){ toast(e.message, true); }
 });
 
@@ -1660,7 +1703,10 @@ function buildDoReceiptText(items, tanggalLabel){
   });
   lines.push('-'.repeat(DO_COL_NO+DO_COL_ITEM+DO_COL_QTY+DO_COL_SAT));
   lines.push('');
-  lines.push('Terima kasih');
+  const totalWidth = DO_COL_NO+DO_COL_ITEM+DO_COL_QTY+DO_COL_SAT;
+  const leftText = 'Terima kasih';
+  const rightText = 'Diterima oleh';
+  lines.push(leftText.padEnd(totalWidth - rightText.length) + rightText);
   return lines.join('\n');
 }
 
