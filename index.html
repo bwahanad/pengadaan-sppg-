@@ -1303,14 +1303,16 @@ function addPoRow(){
       itemSel.innerHTML = '<option value="">Pilih Group dulu</option>';
       return;
     }
-    const items = itemMasterCache.filter(it => it['Group'] === group);
+    const groupNorm = group.trim().toLowerCase();
+    const items = itemMasterCache.filter(it => String(it['Group']||'').trim().toLowerCase() === groupNorm);
     itemSel.innerHTML = items.length
       ? '<option value="">Pilih Item</option>' + items.map(it => `<option value="${it['Item']}">${it['Item']}</option>`).join('')
       : '<option value="">(belum ada item di group ini)</option>';
   });
 
   itemSel.addEventListener('change', () => {
-    const found = itemMasterCache.find(it => it['Group'] === groupSel.value && it['Item'] === itemSel.value);
+    const groupNorm = groupSel.value.trim().toLowerCase();
+    const found = itemMasterCache.find(it => String(it['Group']||'').trim().toLowerCase() === groupNorm && it['Item'] === itemSel.value);
     unitInput.value = found ? (found['satuan'] || '') : '';
   });
 }
