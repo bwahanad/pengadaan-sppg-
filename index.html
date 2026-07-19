@@ -170,7 +170,7 @@
     align-items:center; justify-content:center; padding:20px;
   }
   .confirm-overlay.show{display:flex;}
-  .confirm-box{background:var(--paper); border-radius:16px; padding:22px; max-width:340px; width:100%; box-shadow:var(--shadow); text-align:center;}
+  .confirm-box{background:var(--paper); border-radius:16px; padding:22px; max-width:340px; width:100%; box-shadow:var(--shadow); text-align:center; max-height:90vh; overflow-y:auto;}
   .confirm-box p{font-size:16px; margin:0 0 18px; color:var(--ink); white-space:pre-line;}
   .confirm-actions{display:flex; gap:10px; justify-content:center;}
   .confirm-actions .btn{flex:1;}
@@ -1945,7 +1945,7 @@ function buildInvoiceDoc(d){
   let y = 50; // margin atas 50mm -- menyisakan ruang lebih lebar untuk kop surat
 
   // Lebar kolom tabel (dipakai juga untuk menyelaraskan Nomor Surat/Hal ke border kiri kolom Satuan)
-  const COL_NO = 12, COL_SATUAN = 22, COL_HARGA = 32, COL_JUMLAH = 32;
+  const COL_NO = 12, COL_QTY = 16, COL_SATUAN = 22, COL_HARGA = 32, COL_JUMLAH = 32;
   const satuanLeftX = (pageWidth - marginR) - (COL_SATUAN + COL_HARGA + COL_JUMLAH);
 
   // Judul "TAGIHAN" -- tengah halaman, di atas baris Kepada Yth / Nomor Surat
@@ -1974,14 +1974,14 @@ function buildInvoiceDoc(d){
   const body = d.items.map(it => {
     no++;
     const jumlah = it.qty * it.hargaSatuan;
-    return [String(no), it.nama, it.satuan, 'Rp' + it.hargaSatuan.toLocaleString('id-ID'), 'Rp' + jumlah.toLocaleString('id-ID')];
+    return [String(no), it.nama, String(it.qty), it.satuan, 'Rp' + it.hargaSatuan.toLocaleString('id-ID'), 'Rp' + jumlah.toLocaleString('id-ID')];
   });
 
   doc.autoTable({
     startY: y,
-    head: [['No.','Item','Satuan','Harga Satuan','Jumlah']],
+    head: [['No.','Item','Qty','Satuan','Harga Satuan','Jumlah']],
     body: body,
-    foot: [['', '', '', 'TOTAL', 'Rp' + total.toLocaleString('id-ID')]],
+    foot: [['', '', '', '', 'TOTAL', 'Rp' + total.toLocaleString('id-ID')]],
     theme: 'grid',
     styles: { fontSize: 10, cellPadding: 2 },
     headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', lineWidth: 0.2, lineColor: [0,0,0] },
@@ -1989,9 +1989,10 @@ function buildInvoiceDoc(d){
     columnStyles: {
       0: { cellWidth: COL_NO, halign:'center' },
       1: { cellWidth: 'auto' },
-      2: { cellWidth: COL_SATUAN, halign:'center' },
-      3: { cellWidth: COL_HARGA, halign:'right' },
-      4: { cellWidth: COL_JUMLAH, halign:'right' }
+      2: { cellWidth: COL_QTY, halign:'right' },
+      3: { cellWidth: COL_SATUAN, halign:'center' },
+      4: { cellWidth: COL_HARGA, halign:'right' },
+      5: { cellWidth: COL_JUMLAH, halign:'right' }
     },
     margin: { left: marginL, right: marginR }
   });
