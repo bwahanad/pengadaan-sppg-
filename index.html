@@ -1788,8 +1788,8 @@ function buildInvoiceDoc(d){
   doc.text('Hormat kami,', closingX, closingY+6);
   doc.text(d.namaUD, closingX, closingY+12);
 
-  // Jarak dari baris "Hormat kami," ke "Aang" = 3 spasi (3 baris kosong)
-  const signY = closingY + 6 + (3*6);
+  // Row1: kota,tanggal | Row2: Hormat kami | Row3: Nama UD | Row4-5: kosong | Row6: nama suplier | Row7: jabatan
+  const signY = closingY + (5*6); // baris ke-6
   const namaSigner = d.namaPemilikUD || '________________';
   doc.text(namaSigner, closingX, signY);
   const signerWidth = doc.getTextWidth(namaSigner);
