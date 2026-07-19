@@ -1,18 +1,1917 @@
-const CACHE = 'suplier-sppg-v28';
-const ASSETS = ['./', './index.html', './manifest.json'];
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Pengadaan Bahan Baku SPPG</title>
+<meta name="theme-color" content="#2F4A34">
+<link rel="manifest" href="manifest.json">
 
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
-  self.skipWaiting();
+<!-- Preview saat link di-share (WhatsApp, dll) -->
+<meta property="og:title" content="PO SPPG — Pengadaan Bahan Baku">
+<meta property="og:description" content="Sistem PM · PO · Harga Suplier untuk SPPG.">
+<meta property="og:image" content="https://bwahanad.github.io/pengadaan-sppg-/icon-512.png">
+<meta property="og:url" content="https://bwahanad.github.io/pengadaan-sppg-/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+
+<!-- Ikon untuk Add to Home Screen -->
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --bg:#F6F7F1; --paper:#FFFFFF; --ink:#1E2A20; --ink-soft:#5C6B5E;
+    --leaf:#2F4A34; --leaf-dark:#1F3324; --turmeric:#D9A441; --turmeric-dark:#B8842A;
+    --line:#E3E6DD; --danger:#B8493D; --ok:#3E7A4F; --wait:#B8842A;
+    --radius:14px; --shadow: 0 1px 2px rgba(30,42,32,.06), 0 8px 24px -12px rgba(30,42,32,.18);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg); color:var(--ink); font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh;}
+  h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif; letter-spacing:-0.01em;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  button{font-family:inherit;}
+
+  /* ===== Login / Picker screens ===== */
+  .center-screen{
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+    background: radial-gradient(circle at 15% 10%, rgba(217,164,65,.14), transparent 45%),
+                radial-gradient(circle at 85% 90%, rgba(47,74,52,.12), transparent 45%), var(--bg);
+  }
+  .center-card{background:var(--paper); border-radius:20px; box-shadow:var(--shadow); padding:36px 30px; max-width:420px; width:100%; text-align:center; border-top:6px solid var(--leaf);}
+  .login-mark{width:56px;height:56px;border-radius:50%; background:conic-gradient(from 45deg, var(--leaf), var(--turmeric), var(--leaf)); margin:0 auto 18px; display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Space Grotesk'; font-weight:700; font-size:20px;}
+  .center-card h1{font-size:22px; margin:0 0 4px;}
+  .center-card p{color:var(--ink-soft); font-size:14px; margin:0 0 26px;}
+  #gsiBtn{display:flex; justify-content:center;}
+  .errtext{color:var(--danger); font-size:13px; margin-top:14px; min-height:16px;}
+
+  .sppg-list{display:flex; flex-direction:column; gap:8px; text-align:left; margin-bottom:6px;}
+  .sppg-option{border:1px solid var(--line); border-radius:12px; padding:12px 14px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; background:#FBFBF8;}
+  .sppg-option:hover{border-color:var(--turmeric); background:#FFF9EE;}
+  .sppg-option .nm{font-weight:600; font-size:14px;}
+  .sppg-option .rl{font-size:11px; color:var(--ink-soft); text-transform:capitalize;}
+
+  /* ===== App shell ===== */
+  #app{display:none; min-height:100vh; flex-direction:column;}
+  header.topbar{background:var(--leaf); color:#fff; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:20; flex-wrap:wrap; gap:8px;}
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand-mark{width:30px;height:30px;border-radius:8px;background:var(--turmeric); display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk';font-weight:700;color:var(--leaf-dark);font-size:14px;}
+  .brand-text .name{font-family:'Space Grotesk';font-weight:600;font-size:15px;line-height:1.1;}
+  .brand-text .sub{font-size:11px;opacity:.75;}
+  .userchip{display:flex;align-items:center;gap:8px;font-size:12px; flex-wrap:wrap;}
+  .role-badge{background:rgba(255,255,255,.18); padding:3px 9px; border-radius:20px; font-size:11px; text-transform:capitalize;}
+  .switch-btn,#logoutBtn{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;}
+
+  nav.tabs{display:flex; gap:2px; background:var(--leaf-dark); overflow-x:auto; padding:0 10px; position:sticky; top:56px; z-index:19;}
+  nav.tabs button{background:transparent; border:none; color:rgba(255,255,255,.65); padding:12px 14px; font-size:13px; font-weight:600; cursor:pointer; border-bottom:3px solid transparent; white-space:nowrap;}
+  nav.tabs button.active{color:#fff; border-bottom-color:var(--turmeric);}
+
+  main{flex:1; padding:18px; max-width:980px; margin:0 auto; width:100%;}
+  .view{display:none;} .view.active{display:block;}
+
+  .card{background:var(--paper); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px; margin-bottom:16px; border:1px solid var(--line);}
+  .card h2{font-size:16px; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+  .card h2 .tag{font-size:10px; background:var(--turmeric); color:var(--leaf-dark); padding:2px 7px; border-radius:6px; font-family:'JetBrains Mono';}
+
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:end;}
+  .field{display:flex; flex-direction:column; gap:5px; flex:1; min-width:130px;}
+  .field label{font-size:11px; color:var(--ink-soft); font-weight:600; text-transform:uppercase; letter-spacing:.03em;}
+  input,select{border:1px solid var(--line); border-radius:9px; padding:9px 10px; font-size:14px; background:#FBFBF8; color:var(--ink); font-family:inherit;}
+  input:focus,select:focus{outline:2px solid var(--turmeric); outline-offset:1px; border-color:var(--turmeric);}
+  input:disabled{background:#F0F1EC; color:var(--ink-soft);}
+
+  .btn{border:none; border-radius:9px; padding:10px 16px; font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px;}
+  .btn-primary{background:var(--leaf); color:#fff;} .btn-primary:hover{background:var(--leaf-dark);}
+  .btn:disabled{opacity:.5; cursor:not-allowed; pointer-events:none;}
+  .btn-accent{background:var(--turmeric); color:var(--leaf-dark);} .btn-accent:hover{background:var(--turmeric-dark); color:#fff;}
+  .btn-ghost{background:transparent; border:1px solid var(--line); color:var(--ink);}
+  .btn-sm{padding:6px 10px; font-size:12px; border-radius:7px;}
+
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  thead th{text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); border-bottom:2px solid var(--line); padding:8px 8px;}
+  tbody td{padding:9px 8px; border-bottom:1px dashed var(--line); vertical-align:middle;}
+  tbody tr:hover{background:#FAFAF5;}
+  .num{font-family:'JetBrains Mono'; font-variant-numeric:tabular-nums;}
+  .right{text-align:right;}
+
+  .status-pill{padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; display:inline-block;}
+  .status-wait{background:#FBEFD9; color:var(--wait);}
+  .status-filled{background:#E4F0E6; color:var(--ok);}
+  .status-other{background:#F0F1EC; color:var(--ink-soft);}
+
+  .status-dot{width:7px; height:7px; border-radius:50%; display:inline-block; margin-right:5px; flex-shrink:0;}
+  .status-dot.wait{background:var(--wait);}
+  .status-dot.filled{background:var(--ok);}
+  .status-dot.other{background:var(--ink-soft);}
+  .helptext{font-size:12px; color:var(--ink-soft);}
+
+  .wa-item-row{display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px dashed var(--line);}
+  .wa-item-row:last-child{border-bottom:none;}
+  .wa-check{
+    width:20px; height:20px; border-radius:5px; border:2px solid var(--line); flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; color:#fff;
+    transition:background .15s, border-color .15s;
+  }
+  .wa-check.sent{background:#B9BFB6; border-color:#B9BFB6;}
+  .wa-check.selected{background:var(--leaf-dark); border-color:var(--leaf-dark);}
+  .wa-item-info{flex:1; min-width:0;}
+  .wa-item-info .nm{font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .wa-item-info .meta{font-size:11px; color:var(--ink-soft);}
+  .wa-item-row.was-sent .wa-item-info .nm{color:var(--ink-soft);}
+
+  tr.po-date-group td{
+    background:var(--leaf); color:#fff; font-weight:600; padding:9px 10px;
+    border-bottom:none; display:table-cell;
+  }
+  tr.po-date-group .po-date-group-date{font-size:12px;}
+  tr.po-date-group .po-date-group-total{float:right; font-family:'JetBrains Mono'; font-size:12px;}
+  tr.po-date-group:first-child td{border-top-left-radius:8px; border-top-right-radius:8px;}
+
+  .price-input{width:110px;}
+  .table-wrap{overflow-x:auto; border-radius:10px;}
+  .empty{padding:30px; text-align:center; color:var(--ink-soft); font-size:13px;}
+
+  .summary-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-top:8px;}
+  .summary-item{background:#F6F7F1; border-radius:10px; padding:12px; border:1px solid var(--line);}
+  .summary-item .label{font-size:10px; text-transform:uppercase; color:var(--ink-soft); letter-spacing:.03em;}
+  .summary-item .value{font-family:'JetBrains Mono'; font-weight:600; font-size:16px; margin-top:3px;}
+  .summary-item.pos .value{color:var(--ok);} .summary-item.neg .value{color:var(--danger);}
+
+  .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--leaf-dark); color:#fff; padding:11px 18px; border-radius:10px; font-size:13px; box-shadow:var(--shadow); z-index:99; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(-6px);}
+  .toast.err{background:var(--danger);}
+
+  .item-row-form{border:1px dashed var(--line); border-radius:10px; padding:10px; margin-bottom:8px; background:#FBFBF8;}
+
+  .confirm-overlay{
+    display:none; position:fixed; inset:0; background:rgba(30,42,32,.5); z-index:200;
+    align-items:center; justify-content:center; padding:20px;
+  }
+  .confirm-overlay.show{display:flex;}
+  .confirm-box{background:var(--paper); border-radius:16px; padding:22px; max-width:340px; width:100%; box-shadow:var(--shadow); text-align:center;}
+  .confirm-box p{font-size:14px; margin:0 0 18px; color:var(--ink); white-space:pre-line;}
+  .confirm-actions{display:flex; gap:10px; justify-content:center;}
+  .confirm-actions .btn{flex:1;}
+
+  @media (max-width:640px){
+    main{padding:12px;} .card{padding:14px;}
+    thead{display:none;}
+    tbody tr{display:block; border-bottom:2px solid var(--line); padding:8px 0;}
+    tbody td{display:flex; justify-content:space-between; border-bottom:none; padding:5px 4px;}
+    tbody td::before{content:attr(data-label); font-size:10px; text-transform:uppercase; color:var(--ink-soft); font-weight:600;}
+
+    /* Tabel PO tetap horizontal & kompak (tidak jadi kartu bertumpuk), supaya >=5 baris item kelihatan tanpa scroll */
+    .compact-table thead{display:table-header-group;}
+    .compact-table thead th{font-size:9px; padding:4px 3px;}
+    .compact-table tbody tr.po-date-group{display:table-row; border-bottom:none;}
+    .compact-table tbody tr:not(.po-date-group){display:table-row; padding:0;}
+    .compact-table tbody td{display:table-cell; padding:6px 3px; font-size:11.5px; vertical-align:middle;}
+    .compact-table tbody td::before{content:none;}
+    .compact-table .price-input{width:64px; padding:5px 4px; font-size:11.5px;}
+    .compact-table .po-item-name{max-width:78px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:middle;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div class="center-screen" id="loginScreen">
+  <div class="center-card">
+    <div class="login-mark">SD</div>
+    <h1>Pengadaan Bahan Baku SPPG</h1>
+    <p>Masuk dengan akun Google terdaftar</p>
+    <div id="gsiBtn"></div>
+    <div class="errtext" id="loginError"></div>
+    <button class="btn btn-ghost btn-sm" id="installAppBtn" style="display:none; width:100%; justify-content:center; margin-top:14px;">⬇ Pasang Aplikasi "PO SPPG" ke Layar HP</button>
+    <p class="helptext" id="iosInstallHint" style="display:none; margin-top:12px;">
+      Di iPhone: tap ikon <b>Share</b> (kotak dengan panah ke atas) di Safari, lalu pilih <b>"Add to Home Screen"</b> supaya ikon "PO SPPG" muncul di layar HP.
+    </p>
+  </div>
+</div>
+
+<!-- ================= PILIH SPPG ================= -->
+<div class="center-screen" id="pickerScreen" style="display:none;">
+  <div class="center-card">
+    <div class="login-mark">SD</div>
+    <h1>Pilih SPPG</h1>
+    <p id="pickerSub">Anda punya akses ke lebih dari satu dapur</p>
+    <div class="sppg-list" id="sppgOptions"></div>
+    <div class="errtext" id="pickerError"></div>
+  </div>
+</div>
+
+<!-- ================= DAFTAR DAPUR BARU ================= -->
+<div class="center-screen" id="registerScreen" style="display:none;">
+  <div class="center-card" style="max-width:560px;">
+    <div class="login-mark">SD</div>
+    <h1>Daftar Dapur Baru</h1>
+    <p>Email <b id="regEmail"></b> belum terdaftar. Isi data dapur Bapak di bawah ini.</p>
+    <div class="row" style="text-align:left;">
+      <div class="field" style="min-width:100%;"><label>Nama SPPG / Dapur</label><input type="text" id="regNamaSppg" placeholder="mis. SPPG Dapur Melati"></div>
+      <div class="field" style="min-width:100%;"><label>Link Google Sheet Dapur</label><input type="text" id="regLink" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
+    </div>
+
+    <div style="text-align:left; margin-top:16px; padding-top:14px; border-top:1px dashed var(--line);">
+      <div class="row" style="margin-bottom:6px;">
+        <div class="field" style="min-width:100%;"><label>Kategori 1 — Suplier <span style="font-weight:400; text-transform:none;">(Anda — isi harga satuan)</span></label></div>
+      </div>
+      <div class="row" style="margin-bottom:8px;">
+        <div class="field"><input type="text" id="regSuplierNama" placeholder="Nama UD / Usaha"></div>
+        <div class="field"><input type="text" id="regSuplierNamaPemilik" placeholder="Nama Pemilik UD"></div>
+      </div>
+      <div class="row" style="margin-bottom:8px;">
+        <div class="field"><input type="email" id="regSuplierEmail" placeholder="Email Google (login)"></div>
+        <div class="field"><input type="email" id="regSuplierEmailUD" placeholder="Email UD (untuk invoice)"></div>
+      </div>
+      <div class="row" style="margin-bottom:14px;">
+        <div class="field"><input type="text" id="regSuplierPosisi" placeholder="Posisi (mis. Direktur)"></div>
+        <div class="field"><input type="text" id="regSuplierWa" placeholder="No. HP Pemilik UD"></div>
+      </div>
+
+      <div class="row" style="margin-bottom:6px;">
+        <div class="field" style="min-width:100%;"><label>Kategori 2 — Pengawas Keuangan <span style="font-weight:400; text-transform:none;">(input PM, PO, Item master)</span></label></div>
+      </div>
+      <div class="row" style="margin-bottom:14px;">
+        <div class="field"><input type="text" id="regKeuanganNama" placeholder="Nama"></div>
+        <div class="field"><input type="email" id="regKeuanganEmail" placeholder="Email Google"></div>
+        <div class="field"><input type="text" id="regKeuanganPosisi" value="Pengawas Keuangan"></div>
+        <div class="field"><input type="text" id="regKeuanganWa" placeholder="No. WhatsApp"></div>
+      </div>
+
+      <div class="row" style="margin-bottom:6px;">
+        <div class="field" style="min-width:100%;"><label>Kategori 3 — Monitoring <span style="font-weight:400; text-transform:none;">(lihat PM &amp; PO saja, bisa lebih dari 1 orang)</span></label></div>
+      </div>
+      <div id="regDapurRows"></div>
+      <button class="btn btn-ghost btn-sm" id="addDapurRowBtn" type="button" style="margin-top:2px;">+ Tambah orang</button>
+    </div>
+    <div style="margin-top:14px;"><button class="btn btn-primary" id="submitRegisterBtn" style="width:100%; justify-content:center;">Daftarkan</button></div>
+    <div class="errtext" id="registerError"></div>
+    <div id="registerSuccess" style="display:none; text-align:left; font-size:13px; background:#F6F7F1; border-radius:10px; padding:12px; margin-top:14px; line-height:1.5;"></div>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">SD</div>
+      <div class="brand-text">
+        <div class="name">Pengadaan Bahan Baku SPPG</div>
+        <div class="sub" id="sppgName">-</div>
+      </div>
+    </div>
+    <div class="userchip">
+      <span id="userNama">-</span>
+      <span class="role-badge" id="userRole">-</span>
+      <button class="switch-btn" id="switchSppgBtn">Ganti SPPG</button>
+      <button id="logoutBtn">Keluar</button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs"></nav>
+
+  <main>
+    <!-- ============ PM VIEW ============ -->
+    <section class="view" id="view-pm">
+      <div class="card" id="pmFormCard" style="display:none;">
+        <h2>Buat / Edit PM <span class="tag">Penerima Manfaat</span></h2>
+        <div class="row">
+          <div class="field"><label>Mulai</label><input type="date" id="pmMulai"></div>
+          <div class="field"><label>Sampai</label><input type="date" id="pmSampai"></div>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <div class="field"><label>Kecil — Sen</label><input type="number" class="pm-day-input" id="pk_sen"></div>
+          <div class="field"><label>Besar — Sen</label><input type="number" class="pm-day-input" id="pb_sen"></div>
+          <div class="field"><label>Kecil — Sel</label><input type="number" class="pm-day-input" id="pk_sel"></div>
+          <div class="field"><label>Besar — Sel</label><input type="number" class="pm-day-input" id="pb_sel"></div>
+          <div class="field"><label>Kecil — Rab</label><input type="number" class="pm-day-input" id="pk_rab"></div>
+          <div class="field"><label>Besar — Rab</label><input type="number" class="pm-day-input" id="pb_rab"></div>
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <div class="field"><label>Kecil — Kam</label><input type="number" class="pm-day-input" id="pk_kam"></div>
+          <div class="field"><label>Besar — Kam</label><input type="number" class="pm-day-input" id="pb_kam"></div>
+          <div class="field"><label>Kecil — Jum</label><input type="number" class="pm-day-input" id="pk_jum"></div>
+          <div class="field"><label>Besar — Jum</label><input type="number" class="pm-day-input" id="pb_jum"></div>
+          <div class="field"><label>Kecil — Sab</label><input type="number" class="pm-day-input" id="pk_sab"></div>
+          <div class="field"><label>Besar — Sab</label><input type="number" class="pm-day-input" id="pb_sab"></div>
+        </div>
+        <p style="font-size:13px; color:var(--ink-soft); margin:10px 0 0;">
+          Kuota Belanja (otomatis): <span class="mono" id="pmKuotaPreview" style="font-weight:600; color:var(--ink);">Rp0</span>
+        </p>
+        <div style="margin-top:14px;"><button class="btn btn-primary" id="savePmBtn">Simpan PM</button></div>
+      </div>
+
+      <div class="card">
+        <h2>Daftar PM</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>ID PM</th><th>Periode</th><th class="right">Kuota</th><th class="right">Realisasi</th><th class="right">Selisih</th></tr></thead>
+          <tbody id="pmTableBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ============ PO VIEW ============ -->
+    <section class="view" id="view-po">
+      <div class="card" id="poFormCard" style="display:none;">
+        <h2>Buat PO Baru <span class="tag">Item &amp; Qty</span></h2>
+        <div class="field" style="max-width:260px;margin-bottom:10px;"><label>Periode</label><select id="poFormPm"></select></div>
+        <div id="poFormRows"></div>
+        <button class="btn btn-ghost btn-sm" id="addPoRowBtn" type="button">+ Tambah baris item</button>
+        <div style="margin-top:14px;"><button class="btn btn-primary" id="submitPoBtn">Simpan PO</button></div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <h2 style="margin:0;">Daftar PO</h2>
+          <div class="row" style="gap:8px;">
+            <button class="btn btn-ghost btn-sm" id="openInvoiceBtn" style="display:none;">📄 Invoice PDF</button>
+            <button class="btn btn-ghost btn-sm" id="openPrintDoBtn" style="display:none;">🖨 Print DO</button>
+            <button class="btn btn-accent btn-sm" id="openWaSendBtn" style="display:none;">Kirim PO ke WA Suplier</button>
+          </div>
+        </div>
+        <div class="table-wrap"><table class="compact-table">
+          <thead><tr id="poTableHead"></tr></thead>
+          <tbody id="poTableBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ============ ITEM MASTER VIEW ============ -->
+    <section class="view" id="view-item">
+      <div class="card" id="itemFormCard" style="display:none;">
+        <h2>Tambah / Edit Item <span class="tag">Data Deskriptif</span></h2>
+        <p style="font-size:12px; color:var(--ink-soft); margin-top:-6px;">
+          Untuk item yang sudah ada, ketik nama item persis sama untuk mengedit. Modal/harga pokok
+          diisi terpisah oleh Suplier.
+        </p>
+        <div class="row">
+          <div class="field" style="flex:2;"><label>Nama Item</label><input type="text" id="itemNama" placeholder="mis. Beras"></div>
+          <div class="field"><label>Satuan</label><input type="text" id="itemSatuan" placeholder="kg / pcs / dus"></div>
+          <div class="field">
+            <label>Group</label>
+            <select id="itemGroup">
+              <option value="">Pilih Group</option>
+              <option value="Karbo">Karbo</option>
+              <option value="Protein Hewani">Protein Hewani</option>
+              <option value="Protein Nabati">Protein Nabati</option>
+              <option value="Sayur">Sayur</option>
+              <option value="Buah">Buah</option>
+              <option value="Bumbu">Bumbu</option>
+              <option value="Susu">Susu</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Kategori</label>
+            <select id="itemKategori">
+              <option value="bahan baku">Bahan Baku</option>
+              <option value="operasional">Operasional</option>
+            </select>
+          </div>
+          <div class="field" style="display:none;"><label>Porsi per Unit</label><input type="number" id="itemPorsi" value="0"></div>
+        </div>
+        <div style="margin-top:14px;">
+          <button class="btn btn-primary" id="saveItemBtn">Simpan Item</button>
+          <button class="btn btn-ghost" id="clearItemBtn" type="button">Clear</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Daftar Item</h2>
+        <div class="table-wrap"><table class="compact-table">
+          <thead><tr id="itemTableHead"></tr></thead>
+          <tbody id="itemTableBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ============ LAPORAN VIEW ============ -->
+    <section class="view" id="view-laporan">
+      <div class="card">
+        <h2>Laporan Belanja</h2>
+        <div class="row" style="margin-bottom:6px;">
+          <div class="field"><label>Dari</label><input type="date" id="lapFrom"></div>
+          <div class="field"><label>Sampai</label><input type="date" id="lapTo"></div>
+          <div class="field" style="flex:0;"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" id="lapFilterBtn">Terapkan</button></div>
+        </div>
+        <div class="summary-grid" id="lapSummary"></div>
+      </div>
+      <div class="card">
+        <div class="table-wrap"><table class="compact-table">
+          <thead><tr id="lapTableHead"></tr></thead>
+          <tbody id="lapTableBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ============ SUPERADMIN: PERSETUJUAN SPPG ============ -->
+    <section class="view" id="view-approval">
+      <div class="card">
+        <h2>Persetujuan Pendaftaran Dapur Baru</h2>
+        <p style="font-size:13px; color:var(--ink-soft); margin-top:-6px;">
+          Pastikan admin dapur sudah men-share spreadsheet-nya (akses Editor) ke email Admin Pusat sebelum di-approve.
+        </p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Kode</th><th>Nama SPPG</th><th>Spreadsheet ID</th><th></th></tr></thead>
+          <tbody id="pendingSppgBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ============ ADMIN: USERS ============ -->
+    <section class="view" id="view-users">
+      <div class="card">
+        <h2>Kelola User <span class="tag" id="usersTag">SPPG Aktif</span></h2>
+        <p class="helptext" id="userFormMode" style="margin:-4px 0 8px;"></p>
+        <div class="row item-row-form">
+          <div class="field"><label>Email Google</label><input type="email" id="newUserEmail"></div>
+          <div class="field"><label>Nama <span style="font-weight:400;">(Nama UD kalau Suplier)</span></label><input type="text" id="newUserNama"></div>
+          <div class="field">
+            <label>Role</label>
+            <select id="newUserRole">
+              <option value="suplier">Suplier (isi harga &amp; modal)</option>
+              <option value="keuangan">Pengawas Keuangan (PM/PO/Item)</option>
+              <option value="dapur">Monitoring (read-only)</option>
+              <option value="investor">Investor (lihat semua termasuk modal, read-only)</option>
+              <option value="admin">admin (akses penuh 1 SPPG)</option>
+            </select>
+          </div>
+          <div class="field"><label>Posisi</label><input type="text" id="newUserPosisi" placeholder="mis. Kepala SPPG / Direktur"></div>
+          <div class="field"><label>No. WhatsApp / No. HP Pemilik UD</label><input type="text" id="newUserWa"></div>
+          <div class="field"><label>Nama Pemilik UD <span style="font-weight:400;">(khusus Suplier)</span></label><input type="text" id="newUserNamaPemilik"></div>
+          <div class="field"><label>Email UD <span style="font-weight:400;">(khusus Suplier, untuk invoice)</span></label><input type="email" id="newUserEmailUD"></div>
+          <div class="field"><label>SPPG</label><select id="newUserSppg"></select></div>
+          <div class="field" style="flex:0;"><label>&nbsp;</label><button class="btn btn-primary" id="addUserBtn">Tambah</button></div>
+          <div class="field" style="flex:0;" id="cancelEditUserWrap"><label>&nbsp;</label><button class="btn btn-ghost" id="cancelEditUserBtn" type="button" style="display:none;">Batal Edit</button></div>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Email</th><th>Nama</th><th>Posisi</th><th>Role</th><th>No. WA</th><th>SPPG</th><th>Aktif</th><th></th></tr></thead>
+          <tbody id="usersTableBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <p id="confirmMessage">Yakin?</p>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost btn-sm" id="confirmNoBtn">Batal</button>
+      <button class="btn btn-primary btn-sm" id="confirmYesBtn" style="background:var(--danger);">Ya, Hapus</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="alertOverlay">
+  <div class="confirm-box">
+    <p id="alertMessage">-</p>
+    <div class="confirm-actions">
+      <button class="btn btn-primary btn-sm" id="alertOkBtn">OK</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="waSendOverlay">
+  <div class="confirm-box" style="max-width:400px; text-align:left;">
+    <h3 style="margin:0 0 12px; font-size:16px;">Kirim PO ke WA Suplier</h3>
+    <div class="field" style="margin-bottom:10px;">
+      <label>Tanggal PO</label>
+      <input type="date" id="waSendTanggal">
+    </div>
+    <div class="field" id="waSendSupplierField" style="margin-bottom:6px; display:none;">
+      <label>Kirim ke</label>
+      <select id="waSendSupplierSelect"></select>
+    </div>
+    <p id="waSendInfo" class="helptext" style="margin:6px 0 0;"></p>
+    <div id="waSendItemList" style="max-height:260px; overflow-y:auto; margin-top:10px;"></div>
+    <div class="confirm-actions" style="margin-top:16px;">
+      <button class="btn btn-ghost btn-sm" id="waSendCancelBtn">Batal</button>
+      <button class="btn btn-accent btn-sm" id="waSendConfirmBtn" disabled>Kirim WA</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="printDoOverlay">
+  <div class="confirm-box" style="max-width:420px; text-align:left;">
+    <h3 style="margin:0 0 12px; font-size:16px;">Print DO (Bluetooth 58mm)</h3>
+    <div class="field" style="margin-bottom:10px;">
+      <label>Tanggal PO</label>
+      <input type="date" id="printDoTanggal">
+    </div>
+    <p id="printDoInfo" class="helptext" style="margin:6px 0 0;">Chrome Android/Desktop saja. Pastikan printer thermal Bluetooth sudah menyala &amp; dalam mode pairing.</p>
+    <div id="printDoItemList" style="max-height:200px; overflow-y:auto; margin-top:10px;"></div>
+
+    <div style="margin-top:12px;">
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-soft); font-weight:600; margin-bottom:6px;">Preview Struk</div>
+      <pre id="printDoPreview" style="background:#fff; border:1px solid var(--line); border-radius:6px; padding:10px; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.5; white-space:pre; overflow-x:auto; color:#111; margin:0;">Pilih tanggal &amp; centang item untuk lihat preview.</pre>
+    </div>
+
+    <div class="confirm-actions" style="margin-top:16px;">
+      <button class="btn btn-ghost btn-sm" id="printDoCancelBtn">Batal</button>
+      <button class="btn btn-accent btn-sm" id="printDoConfirmBtn" disabled>Cetak DO</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="invoiceOverlay">
+  <div class="confirm-box" style="max-width:400px; text-align:left;">
+    <h3 style="margin:0 0 12px; font-size:16px;">Buat Invoice PDF</h3>
+    <div class="row" style="margin-bottom:8px;">
+      <div class="field"><label>Tanggal Periode</label><input type="date" id="invoiceTanggal"></div>
+      <div class="field"><label>Nomor Surat</label><input type="text" id="invoiceNomorSurat" placeholder="mis. 001/UD-BJ/VII/2026"></div>
+    </div>
+    <div class="row" style="margin-bottom:8px;">
+      <div class="field"><label>Nama Kota</label><input type="text" id="invoiceKota" placeholder="mis. Batam"></div>
+      <div class="field"><label>Posisi Penandatangan</label><input type="text" id="invoicePosisi" placeholder="mis. Direktur"></div>
+    </div>
+    <p id="invoiceInfo" class="helptext" style="margin:6px 0 0;"></p>
+    <div class="confirm-actions" style="margin-top:16px;">
+      <button class="btn btn-ghost btn-sm" id="invoiceCancelBtn">Batal</button>
+      <button class="btn btn-accent btn-sm" id="invoiceConfirmBtn">Preview Invoice</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="invoicePreviewOverlay">
+  <div class="confirm-box" style="max-width:520px; width:94vw; text-align:left; padding:16px;">
+    <h3 style="margin:0 0 10px; font-size:16px;">Preview Invoice</h3>
+    <iframe id="invoicePreviewFrame" style="width:100%; height:60vh; border:1px solid var(--line); border-radius:8px; background:#fff;"></iframe>
+    <div class="confirm-actions" style="margin-top:14px;">
+      <button class="btn btn-ghost btn-sm" id="invoicePreviewBackBtn">← Kembali Edit</button>
+      <button class="btn btn-accent btn-sm" id="invoicePreviewDownloadBtn">Unduh PDF</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   KONFIGURASI — WAJIB DIISI sebelum deploy (dari SPREADSHEET HUB):
+   ===================================================================== */
+const API_URL = 'https://script.google.com/macros/s/AKfycbyJSB_YBpyC8Za5psrSkuP5xJlgjb0TobMqjECqBLvhHbCqFz6PRwBRfDsmoZU2Qkmvnw/exec';
+const GOOGLE_CLIENT_ID = '437595495608-96f8k2fmdop70jub38ga46f77rov0cjt.apps.googleusercontent.com';
+
+/* ===================================================================== */
+
+let state = { email:null, nama:null, role:null, sppgId:null, sppgNama:null, options:[] };
+const HARI = ['sen','sel','rab','kam','jum','sab'];
+const HARI_LABEL = {sen:'Senin',sel:'Selasa',rab:'Rabu',kam:'Kamis',jum:'Jumat',sab:'Sabtu'};
+
+function fmtRupiah(n){ n = Number(n)||0; return 'Rp' + n.toLocaleString('id-ID'); }
+function fmtDate(d){ if(!d) return '-'; const dt = new Date(d); if(isNaN(dt)) return d; return dt.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'2-digit'}); }
+function toast(msg, isErr){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (isErr?' err':'');
+  setTimeout(()=> t.className='toast', 2600);
+}
+
+function showConfirm(message){
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('confirmOverlay');
+    document.getElementById('confirmMessage').textContent = message;
+    overlay.classList.add('show');
+    const yesBtn = document.getElementById('confirmYesBtn');
+    const noBtn = document.getElementById('confirmNoBtn');
+    const cleanup = (result) => {
+      overlay.classList.remove('show');
+      yesBtn.removeEventListener('click', onYes);
+      noBtn.removeEventListener('click', onNo);
+      resolve(result);
+    };
+    const onYes = () => cleanup(true);
+    const onNo = () => cleanup(false);
+    yesBtn.addEventListener('click', onYes);
+    noBtn.addEventListener('click', onNo);
+  });
+}
+
+function showAlert(message){
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('alertOverlay');
+    document.getElementById('alertMessage').textContent = message;
+    overlay.classList.add('show');
+    const okBtn = document.getElementById('alertOkBtn');
+    const onOk = () => {
+      overlay.classList.remove('show');
+      okBtn.removeEventListener('click', onOk);
+      resolve();
+    };
+    okBtn.addEventListener('click', onOk);
+  });
+}
+
+async function api(action, payload){
+  payload = payload || {};
+  payload.action = action;
+  payload.email = state.email;
+  payload.sppgId = state.sppgId;
+  const res = await fetch(API_URL, { method:'POST', body: JSON.stringify(payload) });
+  const json = await res.json();
+  if(!json.ok) throw new Error(json.error || 'Terjadi kesalahan');
+  return json.data;
+}
+
+/* ---------------- LOGIN ---------------- */
+window.onload = () => {
+  if(!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.indexOf('PASTE') === 0){
+    document.getElementById('loginError').textContent = 'Aplikasi belum dikonfigurasi (Client ID kosong). Hubungi admin.';
+    return;
+  }
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogleCredential });
+  google.accounts.id.renderButton(document.getElementById('gsiBtn'), { theme:'outline', size:'large', shape:'pill', text:'signin_with' });
+};
+
+/* ---------------- PASANG APLIKASI KE LAYAR HP ---------------- */
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const btn = document.getElementById('installAppBtn');
+  if(btn) btn.style.display = 'flex';
+});
+document.getElementById('installAppBtn').addEventListener('click', async () => {
+  if(!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  document.getElementById('installAppBtn').style.display = 'none';
+});
+window.addEventListener('appinstalled', () => {
+  const btn = document.getElementById('installAppBtn');
+  if(btn) btn.style.display = 'none';
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))));
-  self.clients.claim();
+// iOS Safari tidak mendukung beforeinstallprompt -- tampilkan instruksi manual sebagai gantinya
+const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+if(isIos && !isInStandaloneMode){
+  document.getElementById('iosInstallHint').style.display = 'block';
+}
+
+async function onGoogleCredential(response){
+  try{
+    state.idToken = response.credential;
+    const res = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'login', idToken: state.idToken }) });
+    const json = await res.json();
+    if(!json.ok) throw new Error(json.error);
+    state.email = json.data.email; state.nama = json.data.nama; state.options = json.data.options;
+
+    if(json.data.newUser){
+      showRegister();
+    } else if(state.options.length === 1){
+      selectSppg(state.options[0]);
+    } else {
+      showPicker();
+    }
+  } catch(err){
+    document.getElementById('loginError').textContent = err.message;
+  }
+}
+
+function showRegister(){
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('registerScreen').style.display = 'flex';
+  document.getElementById('regEmail').textContent = state.email;
+  document.getElementById('regSuplierEmail').value = state.email;
+  document.getElementById('regSuplierPosisi').value = 'Suplier';
+  document.getElementById('regDapurRows').innerHTML = '';
+  ['Kepala SPPG','Pengawas Gizi','Kepala Masak'].forEach(addDapurRow);
+}
+
+function addDapurRow(posisiHint){
+  const wrap = document.getElementById('regDapurRows');
+  const div = document.createElement('div');
+  div.className = 'row';
+  div.style.marginBottom = '6px';
+  div.innerHTML = `
+    <div class="field"><input type="text" class="reg-dapur-nama" placeholder="Nama"></div>
+    <div class="field"><input type="email" class="reg-dapur-email" placeholder="Email Google"></div>
+    <div class="field"><input type="text" class="reg-dapur-posisi" value="${posisiHint || ''}" placeholder="Posisi"></div>
+    <div class="field"><input type="text" class="reg-dapur-wa" placeholder="No. WhatsApp"></div>
+    <div class="field" style="flex:0;"><button class="btn btn-ghost btn-sm" type="button" onclick="this.closest('.row').remove()">✕</button></div>
+  `;
+  wrap.appendChild(div);
+}
+document.getElementById('addDapurRowBtn').addEventListener('click', () => addDapurRow());
+
+document.getElementById('submitRegisterBtn').addEventListener('click', async () => {
+  const namaSppg = document.getElementById('regNamaSppg').value.trim();
+  const link = document.getElementById('regLink').value.trim();
+  document.getElementById('registerError').textContent = '';
+  if(!namaSppg || !link){ document.getElementById('registerError').textContent = 'Nama SPPG dan link spreadsheet wajib diisi'; return; }
+
+  const tim = {
+    suplier: {
+      nama: document.getElementById('regSuplierNama').value.trim(),
+      email: document.getElementById('regSuplierEmail').value.trim() || state.email,
+      posisi: document.getElementById('regSuplierPosisi').value.trim() || 'Suplier',
+      noWa: document.getElementById('regSuplierWa').value.trim(),
+      namaPemilikUD: document.getElementById('regSuplierNamaPemilik').value.trim(),
+      emailUD: document.getElementById('regSuplierEmailUD').value.trim()
+    },
+    keuangan: {
+      nama: document.getElementById('regKeuanganNama').value.trim(),
+      email: document.getElementById('regKeuanganEmail').value.trim(),
+      posisi: document.getElementById('regKeuanganPosisi').value.trim() || 'Pengawas Keuangan',
+      noWa: document.getElementById('regKeuanganWa').value.trim()
+    },
+    dapur: []
+  };
+  document.querySelectorAll('#regDapurRows .row').forEach(r => {
+    const email = r.querySelector('.reg-dapur-email').value.trim();
+    if(!email) return;
+    tim.dapur.push({
+      email,
+      nama: r.querySelector('.reg-dapur-nama').value.trim(),
+      posisi: r.querySelector('.reg-dapur-posisi').value.trim(),
+      noWa: r.querySelector('.reg-dapur-wa').value.trim()
+    });
+  });
+
+  try{
+    const res = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'registerSppg', idToken: state.idToken, namaSppg, spreadsheetLink: link, tim }) });
+    const json = await res.json();
+    if(!json.ok) throw new Error(json.error);
+    document.getElementById('submitRegisterBtn').style.display = 'none';
+    const box = document.getElementById('registerSuccess');
+    box.style.display = 'block';
+    box.innerHTML = `Pendaftaran terkirim untuk kode SPPG <b>${json.data.sppgId}</b>.<br><br>
+      Langkah selanjutnya: <b>share spreadsheet dapur Bapak</b> (akses Editor) ke email:<br>
+      <span class="mono">${json.data.adminPusatEmail}</span><br><br>
+      Setelah itu, tunggu persetujuan dari Admin Pusat. Tim (Suplier/Pengawas Keuangan/Monitoring) yang
+      tadi diisi akan otomatis aktif bersamaan begitu SPPG disetujui. Anda bisa mencoba login lagi nanti.`;
+  } catch(e){
+    document.getElementById('registerError').textContent = e.message;
+  }
 });
 
-self.addEventListener('fetch', e => {
-  // Jangan cache panggilan API ke Google Apps Script - selalu ambil data terbaru
-  if (e.request.url.includes('script.google.com')) return;
-  e.respondWith(caches.match(e.request).then(cached => cached || fetch(e.request)));
+function showPicker(){
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('pickerScreen').style.display = 'flex';
+  const wrap = document.getElementById('sppgOptions'); wrap.innerHTML = '';
+  state.options.forEach(o => {
+    const div = document.createElement('div');
+    div.className = 'sppg-option';
+    div.innerHTML = `<span class="nm">${o.sppgNama}</span><span class="rl">${o.role}</span>`;
+    div.addEventListener('click', () => selectSppg(o));
+    wrap.appendChild(div);
+  });
+}
+
+function selectSppg(o){
+  state.role = o.role; state.sppgId = o.sppgId; state.sppgNama = o.sppgNama;
+  boot();
+}
+
+document.getElementById('switchSppgBtn').addEventListener('click', () => {
+  document.getElementById('app').style.display = 'none';
+  if(state.options.length > 1){ showPicker(); }
+  else { document.getElementById('loginScreen').style.display = 'flex'; }
 });
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  state = { email:null, nama:null, role:null, sppgId:null, sppgNama:null, options:[] };
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('pickerScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+});
+
+/* ---------------- BOOT / NAV ---------------- */
+async function boot(){
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('pickerScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('userNama').textContent = state.nama;
+  document.getElementById('userRole').textContent = state.role;
+  document.getElementById('sppgName').textContent = state.sppgNama;
+  document.getElementById('switchSppgBtn').style.display = state.options.length > 1 ? 'inline-flex' : 'none';
+
+  buildTabs();
+  showView(document.querySelector('#tabs button').dataset.view);
+}
+
+const TAB_DEFS = [
+  { id:'approval', label:'Persetujuan SPPG', roles:['superadmin'] },
+  { id:'pm', label:'PM', roles:['admin','keuangan','suplier','dapur','investor'] },
+  { id:'po', label:'PO', roles:['admin','keuangan','suplier','dapur','investor'] },
+  { id:'item', label:'Item Master', roles:['admin','keuangan','suplier','investor'] },
+  { id:'laporan', label:'Laporan', roles:['admin','keuangan','suplier','investor'] },
+  { id:'users', label:'Kelola User', roles:['admin','superadmin'] }
+];
+
+function buildTabs(){
+  const nav = document.getElementById('tabs'); nav.innerHTML = '';
+  TAB_DEFS.filter(t => t.roles.includes(state.role)).forEach((t,i) => {
+    const b = document.createElement('button');
+    b.textContent = t.label; b.dataset.view = t.id;
+    if(i===0) b.classList.add('active');
+    b.addEventListener('click', () => showView(t.id));
+    nav.appendChild(b);
+  });
+}
+
+function showView(id){
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-'+id).classList.add('active');
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.view===id));
+  if(id==='pm') loadPM();
+  if(id==='po') loadPO();
+  if(id==='item') loadItemMaster();
+  if(id==='laporan') loadLaporan();
+  if(id==='users') loadUsers();
+  if(id==='approval') loadPendingSppg();
+}
+
+/* ---------------- SUPERADMIN: PERSETUJUAN SPPG ---------------- */
+async function loadPendingSppg(){
+  let list = [];
+  try{ list = await api('getPendingSppg', {}); } catch(e){ toast(e.message, true); return; }
+  const tb = document.getElementById('pendingSppgBody'); tb.innerHTML = '';
+  if(!list.length){ tb.innerHTML = '<tr><td colspan="4" class="empty">Tidak ada pendaftaran menunggu persetujuan</td></tr>'; return; }
+  list.forEach(s => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td data-label="Kode" class="mono">${s.ID_SPPG}</td>
+      <td data-label="Nama SPPG">${s.Nama_SPPG}</td>
+      <td data-label="Spreadsheet ID" class="mono" style="font-size:11px;">${s.Spreadsheet_ID}</td>
+      <td data-label=""><button class="btn btn-accent btn-sm approve-btn">Setujui</button> <button class="btn btn-ghost btn-sm reject-btn">Tolak</button></td>
+    `;
+    tr.querySelector('.approve-btn').addEventListener('click', async () => {
+      try{ await api('approveSppg', { targetSppgId: s.ID_SPPG, approve: true }); toast('SPPG disetujui'); loadPendingSppg(); }
+      catch(e){ toast(e.message, true); }
+    });
+    tr.querySelector('.reject-btn').addEventListener('click', async () => {
+      try{ await api('approveSppg', { targetSppgId: s.ID_SPPG, approve: false }); toast('Pendaftaran ditolak'); loadPendingSppg(); }
+      catch(e){ toast(e.message, true); }
+    });
+    tb.appendChild(tr);
+  });
+}
+
+/* ---------------- PM ---------------- */
+let pmListCache = [];
+
+async function loadPM(){
+  const canEdit = ['admin','keuangan'].includes(state.role);
+  document.getElementById('pmFormCard').style.display = canEdit ? 'block' : 'none';
+  if(canEdit) restorePmFormDefaults();
+  let list = [];
+  try{ list = await api('getPM', {}); }catch(e){ toast(e.message, true); }
+  pmListCache = list;
+  const tb = document.getElementById('pmTableBody'); tb.innerHTML = '';
+  if(!list.length){ tb.innerHTML = '<tr><td colspan="5" class="empty">Belum ada data PM</td></tr>'; }
+  list.forEach(pm => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td data-label="ID PM" class="mono">${pm['ID PM']}</td>
+      <td data-label="Periode">${fmtDate(pm['Mulai'])} – ${fmtDate(pm['Sampai'])}</td>
+      <td data-label="Kuota" class="right num">${fmtRupiah(pm['Kuota Belanja'])}</td>
+      <td data-label="Realisasi" class="right num">${fmtRupiah(pm['Realisasi Belanja'])}</td>
+      <td data-label="Selisih" class="right num" style="color:${pm['Selisih']<0?'var(--danger)':'var(--ok)'}">${fmtRupiah(pm['Selisih'])}</td>
+    `;
+    tb.appendChild(tr);
+  });
+  loadPmDropdownForPO(list);
+}
+
+/** Cek apakah rentang [mulai, sampai] beririsan dengan periode PM manapun yang sudah ada. */
+function findOverlappingPm(mulai, sampai){
+  const newStart = new Date(mulai);
+  const newEnd = new Date(sampai);
+  return pmListCache.find(pm => {
+    const existStart = new Date(pm['Mulai']);
+    const existEnd = new Date(pm['Sampai']);
+    return newStart <= existEnd && newEnd >= existStart;
+  });
+}
+
+const PM_FIELD_IDS = ['pmMulai','pmSampai','pk_sen','pk_sel','pk_rab','pk_kam','pk_jum','pk_sab','pb_sen','pb_sel','pb_rab','pb_kam','pb_jum','pb_sab'];
+function pmDefaultsStorageKey(){ return 'pmFormDefaults_' + (state.sppgId || 'unknown'); }
+
+function savePmFormDefaults(){
+  const values = {};
+  PM_FIELD_IDS.forEach(id => { values[id] = document.getElementById(id).value; });
+  try{ localStorage.setItem(pmDefaultsStorageKey(), JSON.stringify(values)); }catch(e){}
+}
+
+function restorePmFormDefaults(){
+  let values = null;
+  try{ values = JSON.parse(localStorage.getItem(pmDefaultsStorageKey())); }catch(e){}
+  if(!values) return;
+  PM_FIELD_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if(el && !el.value && values[id]) el.value = values[id];
+  });
+  updatePmKuotaPreview();
+}
+
+document.getElementById('savePmBtn').addEventListener('click', async () => {
+  const mulai = document.getElementById('pmMulai').value;
+  const sampai = document.getElementById('pmSampai').value;
+  if(!mulai || !sampai){ toast('Isi tanggal Mulai & Sampai', true); return; }
+
+  const overlap = findOverlappingPm(mulai, sampai);
+  if(overlap){
+    await showAlert('Tanggal ini sudah dibuat PM pada periode sebelumnya\n(' + fmtDate(overlap['Mulai']) + ' – ' + fmtDate(overlap['Sampai']) + ')');
+    return;
+  }
+
+  const data = { 'Mulai': mulai, 'Sampai': sampai };
+  HARI.forEach(h => {
+    data['PM kecil '+HARI_LABEL[h]] = Number(document.getElementById('pk_'+h).value)||0;
+    data['PM Besar '+HARI_LABEL[h]] = Number(document.getElementById('pb_'+h).value)||0;
+  });
+  try{ await api('createPM', {data}); toast('PM tersimpan'); savePmFormDefaults(); loadPM(); }
+  catch(e){ toast(e.message, true); }
+});
+
+function updatePmKuotaPreview(){
+  // Pratinjau di sisi klien saja (Rp8.000/porsi kecil, Rp10.000/porsi besar) -- nilai final dihitung ulang di server.
+  let total = 0;
+  HARI.forEach(h => {
+    total += (Number(document.getElementById('pk_'+h).value)||0) * 8000;
+    total += (Number(document.getElementById('pb_'+h).value)||0) * 10000;
+  });
+  document.getElementById('pmKuotaPreview').textContent = fmtRupiah(total);
+}
+document.querySelectorAll('.pm-day-input').forEach(inp => inp.addEventListener('input', updatePmKuotaPreview));
+
+/* ---------------- PO ---------------- */
+let itemMasterCache = [];
+
+function loadPmDropdownForPO(list){
+  const sel = document.getElementById('poFormPm');
+  sel.innerHTML = list.map(p => `<option value="${p['ID PM']}">${fmtDate(p['Mulai'])} - ${fmtDate(p['Sampai'])}</option>`).join('');
+}
+
+let poListCache = [];
+
+async function loadPO(){
+  const canCreate = ['admin','keuangan'].includes(state.role);
+  const canPrint = ['admin','suplier'].includes(state.role);
+  document.getElementById('poFormCard').style.display = canCreate ? 'block' : 'none';
+  document.getElementById('openWaSendBtn').style.display = canCreate ? 'inline-flex' : 'none';
+  document.getElementById('openPrintDoBtn').style.display = canPrint ? 'inline-flex' : 'none';
+  document.getElementById('openInvoiceBtn').style.display = canPrint ? 'inline-flex' : 'none';
+  itemMasterCache = [];
+  try{ itemMasterCache = await api('getItems', {}); }catch(e){}
+  if(canCreate && !document.getElementById('poFormRows').children.length) addPoRow();
+
+  let list = [];
+  try{ list = await api('getPO', {}); }catch(e){ toast(e.message, true); return; }
+  poListCache = list;
+  renderPOTable(list);
+}
+
+function renderPOTable(list){
+  const canFillPrice = ['admin','suplier'].includes(state.role);
+  const canSeeModal = ['admin','suplier','investor'].includes(state.role);
+  const canEditModal = ['admin','suplier'].includes(state.role);
+  const canDelete = ['admin','keuangan'].includes(state.role);
+
+  const head = document.getElementById('poTableHead');
+  head.innerHTML = `<th>Item</th><th class="right">Qty</th><th>Satuan</th>
+    <th class="right">Harga Satuan</th><th class="right">Jumlah</th>
+    ${canSeeModal ? '<th class="right">Modal/Unit</th><th class="right">Total Modal</th>' : ''}
+    ${canDelete ? '<th></th>' : ''}`;
+
+  const tb = document.getElementById('poTableBody'); tb.innerHTML = '';
+  const colCount = 5 + (canSeeModal?2:0) + (canDelete?1:0);
+  if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Belum ada PO</td></tr>`; return; }
+
+  list.sort((a,b) => new Date(b['Tanggal']) - new Date(a['Tanggal']));
+
+  // Kelompokkan per tanggal, urutan tanggal terbaru dulu (mengikuti urutan list yang sudah di-sort)
+  const groups = [];
+  let currentKey = null, currentGroup = null;
+  list.forEach(po => {
+    const key = fmtDate(po['Tanggal']);
+    if(key !== currentKey){
+      currentGroup = { key, rows: [] };
+      groups.push(currentGroup);
+      currentKey = key;
+    }
+    currentGroup.rows.push(po);
+  });
+
+  groups.forEach(group => {
+    const dailyTotal = group.rows.reduce((s, po) => s + (Number(po['Total Belanja']) || 0), 0);
+    const headerTr = document.createElement('tr');
+    headerTr.className = 'po-date-group';
+    headerTr.innerHTML = `<td colspan="${colCount}"><span class="po-date-group-date">${group.key}</span><span class="po-date-group-total">${fmtRupiah(dailyTotal)}</span></td>`;
+    tb.appendChild(headerTr);
+
+    group.rows.forEach(po => {
+      const tr = document.createElement('tr');
+      const statusDotClass = po['Status']==='menunggu harga' ? 'wait' : (po['Status']==='harga terisi' ? 'filled' : 'other');
+      const priceCell = canFillPrice
+        ? `<input class="price-input mono" type="number" value="${po['Unit Price']||''}" placeholder="isi" data-id="${po['ID']}">`
+        : `<span class="num">${po['Unit Price'] ? fmtRupiah(po['Unit Price']) : '-'}</span>`;
+      const modalCells = canSeeModal ? `
+        <td data-label="Modal/Unit" class="right">${canEditModal
+          ? `<input class="price-input mono modal-input" type="number" value="${po['Modal Per Unit']||''}" placeholder="modal" data-id="${po['ID']}">`
+          : `<span class="num">${po['Modal Per Unit'] ? fmtRupiah(po['Modal Per Unit']) : '-'}</span>`}</td>
+        <td data-label="Total Modal" class="right num">${po['Total Modal'] ? fmtRupiah(po['Total Modal']) : '-'}</td>` : '';
+      const deleteCell = canDelete ? `<td data-label=""><button class="btn btn-ghost btn-sm delete-po-btn" data-id="${po['ID']}" title="Hapus">✕</button></td>` : '';
+      tr.innerHTML = `
+        <td data-label="Item" title="${po['Item']} — ${po['Status']}"><span class="status-dot ${statusDotClass}"></span><span class="po-item-name">${po['Item']}</span></td>
+        <td data-label="Qty" class="right num">${po['Qty']}</td>
+        <td data-label="Satuan">${po['Unit']}</td>
+        <td data-label="Harga Satuan" class="right">${priceCell}</td>
+        <td data-label="Jumlah" class="right num">${po['Total Belanja'] ? fmtRupiah(po['Total Belanja']) : '-'}</td>
+        ${modalCells}
+        ${deleteCell}
+      `;
+      tb.appendChild(tr);
+    });
+  });
+
+  if(canFillPrice){
+    tb.querySelectorAll('.price-input:not(.modal-input)').forEach(inp => {
+      inp.addEventListener('change', async () => {
+        try{ await api('updatePOPrice', { id: inp.dataset.id, unitPrice: Number(inp.value) }); toast('Harga tersimpan'); loadPO(); }
+        catch(e){ toast(e.message, true); }
+      });
+    });
+  }
+  if(canEditModal){
+    tb.querySelectorAll('.modal-input').forEach(inp => {
+      inp.addEventListener('change', async () => {
+        try{ await api('updatePOModal', { id: inp.dataset.id, modalPerUnit: Number(inp.value) }); toast('Modal tersimpan'); loadPO(); }
+        catch(e){ toast(e.message, true); }
+      });
+    });
+  }
+  if(canDelete){
+    tb.querySelectorAll('.delete-po-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if(!(await showConfirm('Hapus PO ini? Data yang dihapus tidak bisa dikembalikan.'))) return;
+        try{ await api('deletePO', { id: btn.dataset.id }); toast('PO dihapus'); loadPO(); }
+        catch(e){ toast(e.message, true); }
+      });
+    });
+  }
+}
+
+const GROUP_OPTIONS = ['Karbo','Protein Hewani','Protein Nabati','Sayur','Buah','Bumbu','Susu'];
+let lastPoTanggal = '';
+
+function addPoRow(){
+  const wrap = document.getElementById('poFormRows');
+  const div = document.createElement('div');
+  div.className = 'item-row-form row';
+  const groupOptionsHtml = GROUP_OPTIONS.map(g => `<option value="${g}">${g}</option>`).join('');
+  div.innerHTML = `
+    <div class="field"><label>Tanggal</label><input type="date" class="po-tanggal" value="${lastPoTanggal}"></div>
+    <div class="field"><label>Group</label><select class="po-group"><option value="">Pilih Group</option>${groupOptionsHtml}</select></div>
+    <div class="field" style="flex:2;"><label>Item</label><select class="po-item"><option value="">Pilih Group dulu</option></select></div>
+    <div class="field"><label>Qty</label><input type="number" class="po-qty"></div>
+    <div class="field"><label>Unit</label><input type="text" class="po-unit" readonly placeholder="otomatis"></div>
+    <div class="field" style="flex:0;"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" type="button" onclick="this.closest('.item-row-form').remove()">Hapus</button></div>
+  `;
+  wrap.appendChild(div);
+
+  const tanggalInput = div.querySelector('.po-tanggal');
+  const groupSel = div.querySelector('.po-group');
+  const itemSel = div.querySelector('.po-item');
+  const unitInput = div.querySelector('.po-unit');
+
+  tanggalInput.addEventListener('change', () => { lastPoTanggal = tanggalInput.value; });
+
+  groupSel.addEventListener('change', () => {
+    const group = groupSel.value;
+    unitInput.value = '';
+    if(!group){
+      itemSel.innerHTML = '<option value="">Pilih Group dulu</option>';
+      return;
+    }
+    const items = itemMasterCache.filter(it => it['Group'] === group);
+    itemSel.innerHTML = items.length
+      ? '<option value="">Pilih Item</option>' + items.map(it => `<option value="${it['Item']}">${it['Item']}</option>`).join('')
+      : '<option value="">(belum ada item di group ini)</option>';
+  });
+
+  itemSel.addEventListener('change', () => {
+    const found = itemMasterCache.find(it => it['Group'] === groupSel.value && it['Item'] === itemSel.value);
+    unitInput.value = found ? (found['satuan'] || '') : '';
+  });
+}
+document.getElementById('addPoRowBtn').addEventListener('click', addPoRow);
+
+/* ---------------- ITEM MASTER ---------------- */
+const GROUP_SORT_ORDER = ['Karbo','Protein Hewani','Protein Nabati','Sayur','Buah','Bumbu','Susu'];
+
+function sortItemsForDisplay(list){
+  return [...list].sort((a,b) => {
+    const ga = GROUP_SORT_ORDER.indexOf(a['Group']);
+    const gb = GROUP_SORT_ORDER.indexOf(b['Group']);
+    const gaIdx = ga === -1 ? GROUP_SORT_ORDER.length : ga;
+    const gbIdx = gb === -1 ? GROUP_SORT_ORDER.length : gb;
+    if(gaIdx !== gbIdx) return gaIdx - gbIdx;
+    return String(a['Item']||'').localeCompare(String(b['Item']||''), 'id', {sensitivity:'base'});
+  });
+}
+
+async function loadItemMaster(){
+  const canManageDescriptive = ['admin','keuangan'].includes(state.role);
+  const canEditModal = ['admin','suplier'].includes(state.role);
+  const canSeeModal = ['admin','suplier','investor'].includes(state.role);
+  const canDelete = ['admin','keuangan'].includes(state.role);
+  document.getElementById('itemFormCard').style.display = canManageDescriptive ? 'block' : 'none';
+
+  let list = [];
+  try{ list = await api('getItems', {}); } catch(e){ toast(e.message, true); return; }
+  itemMasterCache = list;
+  list = sortItemsForDisplay(list);
+
+  const head = document.getElementById('itemTableHead');
+  head.innerHTML = `<th>Item</th><th>Satuan</th><th>Group</th><th>Kategori</th>
+    ${canSeeModal ? '<th class="right">Unit Price</th>' : ''}
+    ${(canManageDescriptive||canDelete) ? '<th></th>' : ''}`;
+
+  const tb = document.getElementById('itemTableBody'); tb.innerHTML = '';
+  const colCount = 4 + (canSeeModal?1:0) + ((canManageDescriptive||canDelete)?1:0);
+  if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Belum ada item</td></tr>`; return; }
+  list.forEach(it => {
+    const tr = document.createElement('tr');
+    const modalCell = canSeeModal ? `<td data-label="Unit Price" class="right">${canEditModal
+      ? `<input class="price-input mono item-modal-input" type="number" value="${it['Unit Price']||''}" placeholder="modal" data-id="${it['ID']}" data-nama="${it['Item']}">`
+      : `<span class="num">${it['Unit Price'] ? fmtRupiah(it['Unit Price']) : '-'}</span>`}</td>` : '';
+    const actionCell = (canManageDescriptive||canDelete) ? `<td data-label="">
+      ${canManageDescriptive ? `<button class="btn btn-ghost btn-sm edit-item-btn" data-id="${it['ID']}">Edit</button>` : ''}
+      ${canDelete ? `<button class="btn btn-ghost btn-sm delete-item-btn" data-id="${it['ID']}">Hapus</button>` : ''}
+    </td>` : '';
+    tr.innerHTML = `
+      <td data-label="Item"><span class="po-item-name">${it['Item']}</span></td>
+      <td data-label="Satuan">${it['satuan']||'-'}</td>
+      <td data-label="Group">${it['Group']||'-'}</td>
+      <td data-label="Kategori">${it['Kategori']||'-'}</td>
+      ${modalCell}
+      ${actionCell}
+    `;
+    tb.appendChild(tr);
+  });
+
+  if(canEditModal){
+    tb.querySelectorAll('.item-modal-input').forEach(inp => {
+      inp.addEventListener('change', async () => {
+        try{
+          const result = await api('saveItemModal', { data:{ ID: inp.dataset.id, Item: inp.dataset.nama, 'Unit Price': Number(inp.value) } });
+          const typed = Number(inp.value) || 0;
+          if(result.price > typed){
+            toast(`Modal tersimpan sebagai ${fmtRupiah(result.price)} (harga tertinggi yang pernah diinput, bukan angka barusan)`);
+          } else {
+            toast('Modal tersimpan');
+          }
+          loadItemMaster();
+        }
+        catch(e){ toast(e.message, true); }
+      });
+    });
+  }
+  if(canManageDescriptive){
+    tb.querySelectorAll('.edit-item-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const it = list.find(x => x['ID'] === btn.dataset.id);
+        if(!it) return;
+        document.getElementById('itemNama').value = it['Item'] || '';
+        document.getElementById('itemSatuan').value = it['satuan'] || '';
+        setItemGroupValue(it['Group'] || '');
+        document.getElementById('itemKategori').value = it['Kategori'] || 'bahan baku';
+        document.getElementById('itemPorsi').value = it['porsi per unit'] || '';
+        document.getElementById('itemFormCard').scrollIntoView({behavior:'smooth'});
+      });
+    });
+  }
+  if(canDelete){
+    tb.querySelectorAll('.delete-item-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if(!(await showConfirm('Hapus item ini? Data yang dihapus tidak bisa dikembalikan.'))) return;
+        try{ await api('deleteItem', { id: btn.dataset.id }); toast('Item dihapus'); loadItemMaster(); }
+        catch(e){ toast(e.message, true); }
+      });
+    });
+  }
+}
+
+/** Set value dropdown Group, cocokkan tanpa peduli huruf besar/kecil dengan opsi yang ada.
+ *  Kalau nilai lama tidak cocok dengan opsi manapun (data lama sebelum jadi dropdown), tambahkan
+ *  sebagai opsi sementara supaya tidak hilang/kosong. */
+function setItemGroupValue(rawValue){
+  const sel = document.getElementById('itemGroup');
+  if(!rawValue){ sel.value = ''; return; }
+  const match = Array.from(sel.options).find(o => o.value.toLowerCase() === rawValue.toLowerCase());
+  if(match){ sel.value = match.value; return; }
+  const opt = document.createElement('option');
+  opt.value = rawValue; opt.textContent = rawValue + ' (belum baku)';
+  sel.appendChild(opt);
+  sel.value = rawValue;
+}
+
+function clearItemForm(){
+  document.getElementById('itemNama').value = '';
+  document.getElementById('itemSatuan').value = '';
+  document.getElementById('itemGroup').value = '';
+  document.getElementById('itemKategori').value = 'bahan baku';
+  document.getElementById('itemPorsi').value = '';
+}
+document.getElementById('clearItemBtn').addEventListener('click', clearItemForm);
+
+document.getElementById('saveItemBtn').addEventListener('click', async () => {
+  const nama = document.getElementById('itemNama').value.trim();
+  const satuan = document.getElementById('itemSatuan').value.trim();
+  const group = document.getElementById('itemGroup').value.trim();
+  const kategori = document.getElementById('itemKategori').value.trim();
+  const porsiRaw = document.getElementById('itemPorsi').value;
+
+  const missing = [];
+  if(!nama) missing.push('Nama Item');
+  if(!satuan) missing.push('Satuan');
+  if(!group) missing.push('Group');
+  if(!kategori) missing.push('Kategori');
+  // Porsi per Unit dinonaktifkan dari UI -- tidak lagi wajib diisi
+  if(missing.length){
+    await showAlert('Kolom berikut belum diisi:\n' + missing.join(', '));
+    return;
+  }
+
+  const data = {
+    Item: nama,
+    satuan: satuan,
+    Group: group,
+    Kategori: kategori,
+    'porsi per unit': Number(porsiRaw) || 0
+  };
+  try{
+    await api('saveItem', { data });
+    toast('Item tersimpan');
+    clearItemForm();
+    loadItemMaster();
+  } catch(e){ toast(e.message, true); }
+});
+
+document.getElementById('submitPoBtn').addEventListener('click', async () => {
+  const rows = [];
+  document.querySelectorAll('#poFormRows .item-row-form').forEach(r => {
+    const item = r.querySelector('.po-item').value.trim();
+    const group = r.querySelector('.po-group').value.trim();
+    if(!item) return;
+    rows.push({
+      Tanggal: r.querySelector('.po-tanggal').value,
+      Item: item,
+      Group: group,
+      Qty: Number(r.querySelector('.po-qty').value) || 0,
+      Unit: r.querySelector('.po-unit').value.trim(),
+      Kategori: 'bahan baku'
+    });
+  });
+  if(!rows.length){ toast('Pilih minimal satu item', true); return; }
+  const pmId = document.getElementById('poFormPm').value;
+  const btn = document.getElementById('submitPoBtn');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'Menyimpan...';
+  try{
+    await api('createPO', { rows, pmId });
+    toast('PO tersimpan');
+    document.getElementById('poFormRows').innerHTML = '';
+    addPoRow();
+    loadPO();
+  } catch(e){ toast(e.message, true); }
+  finally{
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+});
+
+/* ---------------- KIRIM PO KE WA SUPLIER ---------------- */
+let waSuppliersCache = [];
+let waSelectedIds = new Set();
+
+function normalizeWaNumber(raw){
+  let digits = String(raw || '').replace(/[^0-9]/g, '');
+  if(!digits) return '';
+  if(digits.startsWith('0')) digits = '62' + digits.slice(1);
+  else if(digits.startsWith('8')) digits = '62' + digits;
+  return digits;
+}
+
+document.getElementById('openWaSendBtn').addEventListener('click', async () => {
+  const overlay = document.getElementById('waSendOverlay');
+  const tanggalInput = document.getElementById('waSendTanggal');
+  const supplierField = document.getElementById('waSendSupplierField');
+  const supplierSelect = document.getElementById('waSendSupplierSelect');
+  const info = document.getElementById('waSendInfo');
+  tanggalInput.value = lastPoTanggal || '';
+  waSelectedIds = new Set();
+  info.textContent = 'Memuat kontak suplier...';
+  document.getElementById('waSendItemList').innerHTML = '';
+  overlay.classList.add('show');
+
+  try{ waSuppliersCache = await api('getSupplierContacts', {}); }
+  catch(e){ waSuppliersCache = []; }
+
+  const withWa = waSuppliersCache.filter(s => normalizeWaNumber(s.NoWA));
+  if(!withWa.length){
+    info.textContent = 'Belum ada nomor WhatsApp suplier yang terdaftar untuk SPPG ini. Tambahkan lewat Kelola User.';
+    supplierField.style.display = 'none';
+  } else if(withWa.length === 1){
+    supplierField.style.display = 'none';
+    info.textContent = `Akan dikirim ke: ${withWa[0].Nama} (${withWa[0].NoWA})`;
+  } else {
+    supplierField.style.display = 'block';
+    supplierSelect.innerHTML = withWa.map((s,i) => `<option value="${i}">${s.Nama} (${s.NoWA})</option>`).join('');
+    info.textContent = '';
+  }
+
+  renderWaItemList();
+});
+
+document.getElementById('waSendTanggal').addEventListener('change', renderWaItemList);
+
+function renderWaItemList(){
+  const tanggal = document.getElementById('waSendTanggal').value;
+  const wrap = document.getElementById('waSendItemList');
+  waSelectedIds = new Set();
+  updateWaSendButtonState();
+  if(!tanggal){ wrap.innerHTML = ''; return; }
+
+  const rowsForDate = poListCache.filter(po => isoDate(po['Tanggal']) === tanggal);
+  if(!rowsForDate.length){
+    wrap.innerHTML = '<p class="helptext">Tidak ada PO untuk tanggal ini.</p>';
+    return;
+  }
+
+  wrap.innerHTML = rowsForDate.map(po => {
+    const wasSent = String(po['WA_Terkirim']).toUpperCase() === 'YA';
+    return `<div class="wa-item-row ${wasSent?'was-sent':''}" data-id="${po['ID']}">
+      <div class="wa-check ${wasSent?'sent':''}" data-was-sent="${wasSent}"></div>
+      <div class="wa-item-info">
+        <div class="nm">${po['Item']}</div>
+        <div class="meta">${po['Qty']} ${po['Unit']}${wasSent ? ' · sudah pernah dikirim' : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  wrap.querySelectorAll('.wa-item-row').forEach(row => {
+    const checkEl = row.querySelector('.wa-check');
+    checkEl.addEventListener('click', () => {
+      const id = row.dataset.id;
+      const wasSent = checkEl.dataset.wasSent === 'true';
+      if(waSelectedIds.has(id)){
+        waSelectedIds.delete(id);
+        checkEl.classList.remove('selected');
+        checkEl.classList.toggle('sent', wasSent);
+      } else {
+        waSelectedIds.add(id);
+        checkEl.classList.remove('sent');
+        checkEl.classList.add('selected');
+      }
+      updateWaSendButtonState();
+    });
+  });
+}
+
+function updateWaSendButtonState(){
+  document.getElementById('waSendConfirmBtn').disabled = waSelectedIds.size === 0;
+}
+
+document.getElementById('waSendCancelBtn').addEventListener('click', () => {
+  document.getElementById('waSendOverlay').classList.remove('show');
+});
+
+document.getElementById('waSendConfirmBtn').addEventListener('click', async () => {
+  if(!waSelectedIds.size){ toast('Centang minimal satu item', true); return; }
+
+  const withWa = waSuppliersCache.filter(s => normalizeWaNumber(s.NoWA));
+  if(!withWa.length){ toast('Tidak ada nomor WA suplier terdaftar', true); return; }
+  const supplierField = document.getElementById('waSendSupplierField');
+  const chosen = supplierField.style.display === 'block'
+    ? withWa[Number(document.getElementById('waSendSupplierSelect').value)]
+    : withWa[0];
+
+  const btn = document.getElementById('waSendConfirmBtn');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'Mengirim...';
+  try{
+    const result = await api('sendPOWhatsApp', { poIds: Array.from(waSelectedIds), supplierEmail: chosen.Email });
+    toast(`PO terkirim ke ${result.target} (${result.count} item)`);
+    document.getElementById('waSendOverlay').classList.remove('show');
+    loadPO();
+  } catch(e){
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+});
+
+function isoDate(d){
+  const dt = new Date(d);
+  if(isNaN(dt)) return '';
+  return dt.toISOString().slice(0,10);
+}
+
+/* ---------------- PRINT DO (BLUETOOTH THERMAL PRINTER) ---------------- */
+let doSelectedIds = new Set();
+let doPrinterCharacteristic = null; // koneksi printer dipertahankan selama sesi supaya tidak pairing ulang tiap cetak
+
+const PRINTER_SERVICE_UUIDS = [
+  '000018f0-0000-1000-8000-00805f9b34fb',
+  '0000ff00-0000-1000-8000-00805f9b34fb',
+  '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+  '0000ffe0-0000-1000-8000-00805f9b34fb',
+  '0000fee7-0000-1000-8000-00805f9b34fb'
+];
+
+document.getElementById('openPrintDoBtn').addEventListener('click', () => {
+  const overlay = document.getElementById('printDoOverlay');
+  document.getElementById('printDoTanggal').value = lastPoTanggal || '';
+  doSelectedIds = new Set();
+  overlay.classList.add('show');
+  renderPrintDoItemList();
+});
+
+document.getElementById('printDoTanggal').addEventListener('change', () => { renderPrintDoItemList(); renderPrintDoPreview(); });
+
+function renderPrintDoItemList(){
+  const tanggal = document.getElementById('printDoTanggal').value;
+  const wrap = document.getElementById('printDoItemList');
+  doSelectedIds = new Set();
+  updatePrintDoButtonState();
+  if(!tanggal){ wrap.innerHTML = ''; renderPrintDoPreview(); return; }
+
+  const rowsForDate = poListCache.filter(po => isoDate(po['Tanggal']) === tanggal);
+  if(!rowsForDate.length){
+    wrap.innerHTML = '<p class="helptext">Tidak ada PO untuk tanggal ini.</p>';
+    renderPrintDoPreview();
+    return;
+  }
+
+  wrap.innerHTML = rowsForDate.map(po => {
+    const wasPrinted = String(po['DO_Tercetak']).toUpperCase() === 'YA';
+    return `<div class="wa-item-row ${wasPrinted?'was-sent':''}" data-id="${po['ID']}">
+      <div class="wa-check ${wasPrinted?'sent':''}" data-was-sent="${wasPrinted}"></div>
+      <div class="wa-item-info">
+        <div class="nm">${po['Item']}</div>
+        <div class="meta">${po['Qty']} ${po['Unit']}${wasPrinted ? ' · sudah pernah dicetak' : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  wrap.querySelectorAll('.wa-item-row').forEach(row => {
+    const checkEl = row.querySelector('.wa-check');
+    checkEl.addEventListener('click', () => {
+      const id = row.dataset.id;
+      const wasPrinted = checkEl.dataset.wasSent === 'true';
+      if(doSelectedIds.has(id)){
+        doSelectedIds.delete(id);
+        checkEl.classList.remove('selected');
+        checkEl.classList.toggle('sent', wasPrinted);
+      } else {
+        doSelectedIds.add(id);
+        checkEl.classList.remove('sent');
+        checkEl.classList.add('selected');
+      }
+      updatePrintDoButtonState();
+      renderPrintDoPreview();
+    });
+  });
+  renderPrintDoPreview();
+}
+
+function updatePrintDoButtonState(){
+  document.getElementById('printDoConfirmBtn').disabled = doSelectedIds.size === 0;
+}
+
+document.getElementById('printDoCancelBtn').addEventListener('click', () => {
+  document.getElementById('printDoOverlay').classList.remove('show');
+});
+
+async function connectBluetoothPrinter(){
+  if(!navigator.bluetooth){
+    throw new Error('Browser ini tidak mendukung Bluetooth Web API. Gunakan Chrome di Android/Desktop, bukan Safari/in-app browser.');
+  }
+  const device = await navigator.bluetooth.requestDevice({ acceptAllDevices:true, optionalServices: PRINTER_SERVICE_UUIDS });
+  const server = await device.gatt.connect();
+  for(const svcUuid of PRINTER_SERVICE_UUIDS){
+    try{
+      const service = await server.getPrimaryService(svcUuid);
+      const chars = await service.getCharacteristics();
+      const writable = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
+      if(writable) return writable;
+    }catch(e){ /* service tidak ada di printer ini, coba UUID berikutnya */ }
+  }
+  throw new Error('Printer terhubung tapi service cetak tidak dikenali. Model printer ini mungkin belum didukung.');
+}
+
+async function writeToPrinter(characteristic, bytes){
+  const chunkSize = 20; // batas aman ukuran tiap paket BLE write
+  for(let i=0; i<bytes.length; i+=chunkSize){
+    const chunk = bytes.slice(i, i+chunkSize);
+    if(characteristic.properties.writeWithoutResponse){
+      await characteristic.writeValueWithoutResponse(chunk);
+    } else {
+      await characteristic.writeValue(chunk);
+    }
+    await new Promise(r => setTimeout(r, 25));
+  }
+}
+
+/* Printer 58mm (Font A) muat sekitar 32 karakter per baris. */
+const DO_COL_NO = 3, DO_COL_ITEM = 15, DO_COL_QTY = 5, DO_COL_SAT = 7;
+function padCol(str, width, right){
+  str = String(str == null ? '' : str);
+  if(str.length > width) str = str.slice(0, width);
+  return right ? str.padStart(width, ' ') : str.padEnd(width, ' ');
+}
+
+/** Bangun teks struk polos (dipakai untuk preview DAN untuk dikirim ke printer). */
+function buildDoReceiptText(items, tanggalLabel){
+  const namaUd = state.nama || 'Suplier';
+  const lines = [];
+  lines.push(namaUd);
+  lines.push(tanggalLabel);
+  lines.push('-'.repeat(DO_COL_NO+DO_COL_ITEM+DO_COL_QTY+DO_COL_SAT));
+  lines.push(padCol('No', DO_COL_NO) + padCol('Item', DO_COL_ITEM) + padCol('Qty', DO_COL_QTY, true) + padCol('Sat', DO_COL_SAT, true));
+  lines.push('-'.repeat(DO_COL_NO+DO_COL_ITEM+DO_COL_QTY+DO_COL_SAT));
+  items.forEach((it, i) => {
+    lines.push(padCol(i+1, DO_COL_NO) + padCol(it.nama, DO_COL_ITEM) + padCol(it.qty, DO_COL_QTY, true) + padCol(it.satuan, DO_COL_SAT, true));
+  });
+  lines.push('-'.repeat(DO_COL_NO+DO_COL_ITEM+DO_COL_QTY+DO_COL_SAT));
+  lines.push('');
+  lines.push('Terima kasih');
+  return lines.join('\n');
+}
+
+function renderPrintDoPreview(){
+  const pre = document.getElementById('printDoPreview');
+  const tanggal = document.getElementById('printDoTanggal').value;
+  if(!tanggal || !doSelectedIds.size){
+    pre.textContent = 'Pilih tanggal & centang item untuk lihat preview.';
+    return;
+  }
+  const items = poListCache
+    .filter(po => doSelectedIds.has(String(po['ID'])))
+    .map(po => ({ nama: po['Item'], qty: po['Qty'], satuan: po['Unit'] }));
+  pre.textContent = buildDoReceiptText(items, fmtDate(tanggal));
+}
+
+function buildDoEscPos(items, tanggalLabel){
+  const enc = new TextEncoder();
+  const bytes = [];
+  const push = (arr) => arr.forEach(b => bytes.push(b));
+
+  push([0x1B,0x40]);          // reset printer
+  push(Array.from(enc.encode(buildDoReceiptText(items, tanggalLabel))));
+  push([0x0A,0x0A,0x0A]);     // spasi sebelum potong
+  push([0x1D,0x56,0x01]);     // potong kertas (diabaikan kalau printer tidak punya cutter)
+
+  return new Uint8Array(bytes);
+}
+
+document.getElementById('printDoConfirmBtn').addEventListener('click', async () => {
+  if(!doSelectedIds.size){ toast('Centang minimal satu item', true); return; }
+  const tanggal = document.getElementById('printDoTanggal').value;
+  const rowsForDate = poListCache.filter(po => doSelectedIds.has(String(po['ID'])));
+  if(!rowsForDate.length){ toast('Item tidak ditemukan', true); return; }
+
+  const btn = document.getElementById('printDoConfirmBtn');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+
+  try{
+    if(!doPrinterCharacteristic){
+      btn.textContent = 'Menghubungkan printer...';
+      doPrinterCharacteristic = await connectBluetoothPrinter();
+    }
+    btn.textContent = 'Mencetak...';
+    const items = rowsForDate.map(po => ({ nama: po['Item'], qty: po['Qty'], satuan: po['Unit'] }));
+    const bytes = buildDoEscPos(items, fmtDate(tanggal));
+    await writeToPrinter(doPrinterCharacteristic, bytes);
+
+    await api('markPoPrinted', { poIds: Array.from(doSelectedIds) });
+    toast(`DO tercetak (${items.length} item)`);
+    document.getElementById('printDoOverlay').classList.remove('show');
+    loadPO();
+  } catch(e){
+    doPrinterCharacteristic = null; // koneksi kemungkinan putus, coba sambung ulang lain kali
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+});
+
+/* ---------------- INVOICE PDF (SUPLIER) ---------------- */
+let myProfileCache = null;
+
+document.getElementById('openInvoiceBtn').addEventListener('click', async () => {
+  const overlay = document.getElementById('invoiceOverlay');
+  const info = document.getElementById('invoiceInfo');
+  document.getElementById('invoiceTanggal').value = lastPoTanggal || '';
+  document.getElementById('invoiceNomorSurat').value = '';
+  info.textContent = 'Memuat profil...';
+  overlay.classList.add('show');
+
+  try{
+    myProfileCache = await api('getMyProfile', {});
+    document.getElementById('invoicePosisi').value = myProfileCache.Posisi || '';
+    let kota = '';
+    try{ kota = localStorage.getItem('invoiceKota_' + state.sppgId) || ''; }catch(e){}
+    document.getElementById('invoiceKota').value = kota;
+    if(!myProfileCache.NamaPemilikUD){
+      info.textContent = 'Nama Pemilik UD belum diisi. Lengkapi dulu lewat Kelola User supaya tanda tangan invoice terisi.';
+    } else {
+      info.textContent = '';
+    }
+  } catch(e){
+    info.textContent = '';
+    toast(e.message, true);
+  }
+});
+
+document.getElementById('invoiceCancelBtn').addEventListener('click', () => {
+  document.getElementById('invoiceOverlay').classList.remove('show');
+});
+
+let currentInvoiceDoc = null;
+let currentInvoicePreviewUrl = null;
+
+document.getElementById('invoiceConfirmBtn').addEventListener('click', async () => {
+  const tanggal = document.getElementById('invoiceTanggal').value;
+  const nomorSurat = document.getElementById('invoiceNomorSurat').value.trim();
+  const kota = document.getElementById('invoiceKota').value.trim();
+  const posisi = document.getElementById('invoicePosisi').value.trim();
+
+  if(!tanggal){ toast('Pilih tanggal periode', true); return; }
+  if(!nomorSurat){ toast('Isi nomor surat', true); return; }
+  if(!kota){ toast('Isi nama kota', true); return; }
+
+  const rowsForDate = poListCache.filter(po => isoDate(po['Tanggal']) === tanggal);
+  if(!rowsForDate.length){ toast('Tidak ada PO untuk tanggal ini', true); return; }
+  if(!window.jspdf){ toast('Library PDF belum termuat, coba lagi sebentar', true); return; }
+
+  try{ localStorage.setItem('invoiceKota_' + state.sppgId, kota); }catch(e){}
+
+  const profile = myProfileCache || {};
+  const invoiceData = {
+    namaDapur: state.sppgNama || '',
+    namaUD: profile.Nama || state.nama || '',
+    namaPemilikUD: profile.NamaPemilikUD || '',
+    posisi: posisi || profile.Posisi || '',
+    nomorSurat, kota,
+    tanggalLabel: fmtDate(tanggal),
+    items: rowsForDate.map(po => ({
+      nama: po['Item'], satuan: po['Unit'], qty: Number(po['Qty'])||0,
+      hargaSatuan: Number(po['Unit Price'])||0
+    }))
+  };
+
+  currentInvoiceDoc = buildInvoiceDoc(invoiceData);
+  currentInvoiceDoc._filename = 'Invoice_' + (nomorSurat||'DO').replace(/[^a-zA-Z0-9]/g,'_') + '.pdf';
+
+  if(currentInvoicePreviewUrl) URL.revokeObjectURL(currentInvoicePreviewUrl);
+  currentInvoicePreviewUrl = currentInvoiceDoc.output('bloburl');
+  document.getElementById('invoicePreviewFrame').src = currentInvoicePreviewUrl;
+
+  document.getElementById('invoiceOverlay').classList.remove('show');
+  document.getElementById('invoicePreviewOverlay').classList.add('show');
+});
+
+document.getElementById('invoicePreviewBackBtn').addEventListener('click', () => {
+  document.getElementById('invoicePreviewOverlay').classList.remove('show');
+  document.getElementById('invoiceOverlay').classList.add('show');
+});
+
+document.getElementById('invoicePreviewDownloadBtn').addEventListener('click', () => {
+  if(!currentInvoiceDoc) return;
+  currentInvoiceDoc.save(currentInvoiceDoc._filename);
+  toast('Invoice diunduh');
+  document.getElementById('invoicePreviewOverlay').classList.remove('show');
+});
+
+function buildInvoiceDoc(d){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginL = 20, marginR = 20;
+  let y = 22;
+
+  // Lebar kolom tabel (dipakai juga untuk menyelaraskan Nomor Surat/Hal ke border kiri kolom Satuan)
+  const COL_NO = 12, COL_SATUAN = 22, COL_HARGA = 32, COL_JUMLAH = 32;
+  const satuanLeftX = (pageWidth - marginR) - (COL_SATUAN + COL_HARGA + COL_JUMLAH);
+
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(11);
+
+  // Header kiri: Kepada Yth
+  doc.text('Kepada Yth,', marginL, y);
+  doc.text('Kepala SPPG', marginL, y+6);
+  doc.text(d.namaDapur, marginL, y+12);
+
+  // Header kanan: nomor surat & hal -- posisi sejajar border kiri kolom Satuan, teks rata KIRI
+  doc.text('Nomor Surat : ' + d.nomorSurat, satuanLeftX, y);
+  doc.text('Hal : Tagihan Bahan Baku periode ' + d.tanggalLabel, satuanLeftX, y+6);
+
+  y += 26;
+
+  // Tabel item
+  let no = 0;
+  const total = d.items.reduce((s,it) => s + it.qty*it.hargaSatuan, 0);
+  const body = d.items.map(it => {
+    no++;
+    const jumlah = it.qty * it.hargaSatuan;
+    return [String(no), it.nama, it.satuan, 'Rp' + it.hargaSatuan.toLocaleString('id-ID'), 'Rp' + jumlah.toLocaleString('id-ID')];
+  });
+
+  doc.autoTable({
+    startY: y,
+    head: [['No.','Item','Satuan','Harga Satuan','Jumlah']],
+    body: body,
+    foot: [['', '', '', 'TOTAL', 'Rp' + total.toLocaleString('id-ID')]],
+    theme: 'grid',
+    styles: { fontSize: 10, cellPadding: 2 },
+    headStyles: { fillColor: [47,74,52], textColor: 255, fontStyle: 'bold' },
+    footStyles: { fillColor: [240,241,236], textColor: [30,42,32], fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: COL_NO, halign:'center' },
+      1: { cellWidth: 'auto' },
+      2: { cellWidth: COL_SATUAN, halign:'center' },
+      3: { cellWidth: COL_HARGA, halign:'right' },
+      4: { cellWidth: COL_JUMLAH, halign:'right' }
+    },
+    margin: { left: marginL, right: marginR }
+  });
+
+  let closingY = doc.lastAutoTable.finalY + 16;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  if(closingY > pageHeight - 55){ doc.addPage(); closingY = 25; }
+
+  // Penutup -- blok diposisikan di sisi kanan halaman, tapi teksnya rata KIRI (bukan rata kanan per baris)
+  const closingX = pageWidth - marginR - 70; // lebar blok ~70mm, cukup untuk baris terpanjang
+  doc.text(d.kota + ', ' + d.tanggalLabel, closingX, closingY);
+  doc.text('Hormat kami,', closingX, closingY+6);
+  doc.text(d.namaUD, closingX, closingY+12);
+
+  // Jarak dari baris "Hormat kami," ke "Aang" = 3 spasi (3 baris kosong)
+  const signY = closingY + 6 + (3*6);
+  const namaSigner = d.namaPemilikUD || '________________';
+  doc.text(namaSigner, closingX, signY);
+  const signerWidth = doc.getTextWidth(namaSigner);
+  doc.setLineWidth(0.2); // pastikan cuma 1 garis tipis yang bersih, bukan tampak dobel
+  doc.line(closingX, signY+1.5, closingX+signerWidth, signY+1.5);
+  doc.text(d.posisi || '', closingX, signY+6);
+
+  return doc;
+}
+
+/* ---------------- LAPORAN ---------------- */
+async function loadLaporan(){
+  const from = document.getElementById('lapFrom').value;
+  const to = document.getElementById('lapTo').value;
+  let data;
+  try{ data = await api('getLaporan', { from, to }); } catch(e){ toast(e.message, true); return; }
+  const s = data.summary;
+  const canSeeModal = s.totalModal !== null && s.totalModal !== undefined;
+  document.getElementById('lapSummary').innerHTML = `
+    <div class="summary-item"><div class="label">Total Belanja</div><div class="value">${fmtRupiah(s.totalBelanja)}</div></div>
+    ${canSeeModal ? `
+    <div class="summary-item"><div class="label">Total Modal</div><div class="value">${fmtRupiah(s.totalModal)}</div></div>
+    <div class="summary-item ${s.margin>=0?'pos':'neg'}"><div class="label">Margin</div><div class="value">${fmtRupiah(s.margin)}</div></div>
+    <div class="summary-item"><div class="label">% Margin</div><div class="value">${s.pctMargin.toFixed(1)}%</div></div>` : ''}
+  `;
+  const head = document.getElementById('lapTableHead');
+  head.innerHTML = `<th>Tanggal</th><th>Item</th><th class="right">Qty</th><th class="right">Total Belanja</th>
+    ${canSeeModal ? '<th class="right">Harga Satuan</th><th class="right">Jumlah</th><th class="right">Modal</th><th class="right">Margin</th>' : ''}`;
+  const tb = document.getElementById('lapTableBody'); tb.innerHTML = '';
+  const colCount = 4 + (canSeeModal?4:0);
+  if(!data.rows.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Tidak ada data pada rentang ini</td></tr>`; return; }
+  data.rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td data-label="Tanggal">${fmtDate(r['Tanggal'])}</td>
+      <td data-label="Item"><span class="po-item-name">${r['Item']}</span></td>
+      <td data-label="Qty" class="right num">${r['Qty']}</td>
+      <td data-label="Total Belanja" class="right num">${fmtRupiah(r['Total Belanja'])}</td>
+      ${canSeeModal ? `
+      <td data-label="Harga Satuan" class="right num">${fmtRupiah(r['Harga Satuan Item'])}</td>
+      <td data-label="Jumlah" class="right num">${fmtRupiah(r['Jumlah Item'])}</td>
+      <td data-label="Modal" class="right num">${fmtRupiah(r['Total Modal'])}</td>
+      <td data-label="Margin" class="right num">${fmtRupiah(r['Margin'])}</td>` : ''}
+    `;
+    tb.appendChild(tr);
+  });
+}
+document.getElementById('lapFilterBtn').addEventListener('click', loadLaporan);
+
+/* ---------------- USERS (admin: 1 SPPG, superadmin: semua) ---------------- */
+let editingUserKey = null; // {Email, SPPG_ID} baris yang sedang diedit, null kalau mode tambah baru
+
+async function loadUsers(){
+  const isSuperadmin = state.role === 'superadmin';
+  const realSppgOptions = state.options.filter(o => o.sppgId); // buang opsi "Admin Pusat" (sppgId null)
+  const sppgSel = document.getElementById('newUserSppg');
+
+  if(isSuperadmin){
+    document.getElementById('usersTag').textContent = 'Semua SPPG';
+    sppgSel.innerHTML = realSppgOptions.map(o => `<option value="${o.sppgId}">${o.sppgNama}</option>`).join('');
+    sppgSel.disabled = false;
+  } else {
+    document.getElementById('usersTag').textContent = state.sppgNama;
+    sppgSel.innerHTML = `<option value="${state.sppgId}">${state.sppgNama}</option>`;
+    sppgSel.disabled = true;
+  }
+
+  let list = [];
+  try{ list = await api('getUsers', {}); } catch(e){ toast(e.message, true); return; }
+  const tb = document.getElementById('usersTableBody'); tb.innerHTML = '';
+  list.forEach(u => {
+    const sppgLabel = realSppgOptions.find(o=>o.sppgId===u.SPPG_ID)?.sppgNama || u.SPPG_ID || '-';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td data-label="Email">${u.Email}</td>
+      <td data-label="Nama">${u.Nama}</td>
+      <td data-label="Posisi">${u.Posisi || '-'}</td>
+      <td data-label="Role">${u.Role}</td>
+      <td data-label="No. WA">${u.NoWA || '-'}</td>
+      <td data-label="SPPG">${sppgLabel}</td>
+      <td data-label="Aktif">${u.Aktif}</td>
+      <td data-label=""><button class="btn btn-ghost btn-sm edit-user-btn">Edit</button> <button class="btn btn-ghost btn-sm toggle-active">${String(u.Aktif).toUpperCase()==='YA'?'Nonaktifkan':'Aktifkan'}</button></td>
+    `;
+    tr.querySelector('.edit-user-btn').addEventListener('click', () => startEditUser(u));
+    tr.querySelector('.toggle-active').addEventListener('click', async () => {
+      const newAktif = String(u.Aktif).toUpperCase()==='YA' ? 'TIDAK' : 'YA';
+      try{ await api('saveUser', { data:{ Email:u.Email, Nama:u.Nama, Role:u.Role, SPPG_ID:u.SPPG_ID, Aktif:newAktif, Posisi:u.Posisi, NoWA:u.NoWA, NamaPemilikUD:u.NamaPemilikUD, EmailUD:u.EmailUD } }); loadUsers(); }
+      catch(e){ toast(e.message, true); }
+    });
+    tb.appendChild(tr);
+  });
+}
+
+function startEditUser(u){
+  editingUserKey = { Email: u.Email, SPPG_ID: u.SPPG_ID };
+  document.getElementById('newUserEmail').value = u.Email;
+  document.getElementById('newUserEmail').disabled = true; // email = kunci baris, tidak diubah saat edit
+  document.getElementById('newUserNama').value = u.Nama || '';
+  document.getElementById('newUserRole').value = u.Role;
+  document.getElementById('newUserPosisi').value = u.Posisi || '';
+  document.getElementById('newUserWa').value = u.NoWA || '';
+  document.getElementById('newUserNamaPemilik').value = u.NamaPemilikUD || '';
+  document.getElementById('newUserEmailUD').value = u.EmailUD || '';
+  if(document.getElementById('newUserSppg').querySelector(`option[value="${u.SPPG_ID}"]`)){
+    document.getElementById('newUserSppg').value = u.SPPG_ID;
+  }
+  document.getElementById('addUserBtn').textContent = 'Simpan Perubahan';
+  document.getElementById('cancelEditUserBtn').style.display = 'inline-flex';
+  document.getElementById('userFormMode').textContent = `Mengedit: ${u.Email}`;
+  document.querySelector('#view-users .card').scrollIntoView({behavior:'smooth'});
+}
+
+function resetUserForm(){
+  editingUserKey = null;
+  document.getElementById('newUserEmail').disabled = false;
+  document.getElementById('newUserEmail').value = '';
+  document.getElementById('newUserNama').value = '';
+  document.getElementById('newUserPosisi').value = '';
+  document.getElementById('newUserWa').value = '';
+  document.getElementById('newUserNamaPemilik').value = '';
+  document.getElementById('newUserEmailUD').value = '';
+  document.getElementById('addUserBtn').textContent = 'Tambah';
+  document.getElementById('cancelEditUserBtn').style.display = 'none';
+  document.getElementById('userFormMode').textContent = '';
+}
+document.getElementById('cancelEditUserBtn').addEventListener('click', resetUserForm);
+
+document.getElementById('addUserBtn').addEventListener('click', async () => {
+  const isSuperadmin = state.role === 'superadmin';
+  const data = {
+    Email: document.getElementById('newUserEmail').value.trim(),
+    Nama: document.getElementById('newUserNama').value.trim(),
+    Role: document.getElementById('newUserRole').value,
+    Posisi: document.getElementById('newUserPosisi').value.trim(),
+    NoWA: document.getElementById('newUserWa').value.trim(),
+    NamaPemilikUD: document.getElementById('newUserNamaPemilik').value.trim(),
+    EmailUD: document.getElementById('newUserEmailUD').value.trim(),
+    SPPG_ID: isSuperadmin ? document.getElementById('newUserSppg').value : state.sppgId,
+    Aktif: 'YA'
+  };
+  if(!data.Email){ toast('Isi email', true); return; }
+  try{
+    await api('saveUser', {data});
+    toast(editingUserKey ? 'Perubahan tersimpan' : 'User tersimpan');
+    resetUserForm();
+    loadUsers();
+  }
+  catch(e){ toast(e.message, true); }
+});
+</script>
+</body>
+</html>
