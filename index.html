@@ -543,7 +543,11 @@
       <select id="waSendSupplierSelect"></select>
     </div>
     <p id="waSendInfo" class="helptext" style="margin:6px 0 0;"></p>
-    <div id="waSendItemList" style="max-height:260px; overflow-y:auto; margin-top:10px;"></div>
+    <div class="wa-item-row" id="waSelectAllRow" style="border-bottom:2px solid var(--line); display:none;">
+      <div class="wa-check" id="waSelectAllCheck"></div>
+      <div class="wa-item-info"><div class="nm">Pilih Semua</div></div>
+    </div>
+    <div id="waSendItemList" style="max-height:260px; overflow-y:auto; margin-top:2px;"></div>
     <div class="confirm-actions" style="margin-top:16px;">
       <button class="btn btn-ghost btn-sm" id="waSendCancelBtn">Batal</button>
       <button class="btn btn-accent btn-sm" id="waSendConfirmBtn" disabled>Kirim WA</button>
@@ -559,7 +563,11 @@
       <input type="date" id="printDoTanggal">
     </div>
     <p id="printDoInfo" class="helptext" style="margin:6px 0 0;">Chrome Android/Desktop saja. Pastikan printer thermal Bluetooth sudah menyala &amp; dalam mode pairing.</p>
-    <div id="printDoItemList" style="max-height:200px; overflow-y:auto; margin-top:10px;"></div>
+    <div class="wa-item-row" id="printDoSelectAllRow" style="border-bottom:2px solid var(--line); display:none;">
+      <div class="wa-check" id="printDoSelectAllCheck"></div>
+      <div class="wa-item-info"><div class="nm">Pilih Semua</div></div>
+    </div>
+    <div id="printDoItemList" style="max-height:200px; overflow-y:auto; margin-top:2px;"></div>
 
     <div style="margin-top:12px;">
       <div style="font-size:13px; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-soft); font-weight:600; margin-bottom:6px;">Preview Struk</div>
@@ -1489,15 +1497,20 @@ document.getElementById('waSendTanggal').addEventListener('change', renderWaItem
 function renderWaItemList(){
   const tanggal = document.getElementById('waSendTanggal').value;
   const wrap = document.getElementById('waSendItemList');
+  const selectAllRow = document.getElementById('waSelectAllRow');
+  const selectAllCheck = document.getElementById('waSelectAllCheck');
   waSelectedIds = new Set();
   updateWaSendButtonState();
-  if(!tanggal){ wrap.innerHTML = ''; return; }
+  if(!tanggal){ wrap.innerHTML = ''; selectAllRow.style.display = 'none'; return; }
 
   const rowsForDate = poListCache.filter(po => isoDate(po['Tanggal']) === tanggal);
   if(!rowsForDate.length){
     wrap.innerHTML = '<p class="helptext">Tidak ada PO untuk tanggal ini.</p>';
+    selectAllRow.style.display = 'none';
     return;
   }
+  selectAllRow.style.display = 'flex';
+  selectAllCheck.classList.remove('selected','sent');
 
   wrap.innerHTML = rowsForDate.map(po => {
     const wasSent = String(po['WA_Terkirim']).toUpperCase() === 'YA';
@@ -1510,22 +1523,39 @@ function renderWaItemList(){
     </div>`;
   }).join('');
 
+  function toggleRow(row, checkEl){
+    const id = row.dataset.id;
+    const wasSent = checkEl.dataset.wasSent === 'true';
+    if(waSelectedIds.has(id)){
+      waSelectedIds.delete(id);
+      checkEl.classList.remove('selected');
+      checkEl.classList.toggle('sent', wasSent);
+    } else {
+      waSelectedIds.add(id);
+      checkEl.classList.remove('sent');
+      checkEl.classList.add('selected');
+    }
+  }
+
   wrap.querySelectorAll('.wa-item-row').forEach(row => {
     const checkEl = row.querySelector('.wa-check');
     checkEl.addEventListener('click', () => {
-      const id = row.dataset.id;
-      const wasSent = checkEl.dataset.wasSent === 'true';
-      if(waSelectedIds.has(id)){
-        waSelectedIds.delete(id);
-        checkEl.classList.remove('selected');
-        checkEl.classList.toggle('sent', wasSent);
-      } else {
-        waSelectedIds.add(id);
-        checkEl.classList.remove('sent');
-        checkEl.classList.add('selected');
-      }
+      toggleRow(row, checkEl);
+      selectAllCheck.classList.toggle('selected', waSelectedIds.size === rowsForDate.length);
       updateWaSendButtonState();
     });
+  });
+
+  selectAllCheck.addEventListener('click', () => {
+    const allSelected = waSelectedIds.size === rowsForDate.length;
+    wrap.querySelectorAll('.wa-item-row').forEach(row => {
+      const checkEl = row.querySelector('.wa-check');
+      const isSelected = checkEl.classList.contains('selected');
+      if(allSelected && isSelected) toggleRow(row, checkEl); // batalkan semua
+      else if(!allSelected && !isSelected) toggleRow(row, checkEl); // pilih semua
+    });
+    selectAllCheck.classList.toggle('selected', !allSelected);
+    updateWaSendButtonState();
   });
 }
 
@@ -1600,16 +1630,21 @@ document.getElementById('printDoTanggal').addEventListener('change', () => { ren
 function renderPrintDoItemList(){
   const tanggal = document.getElementById('printDoTanggal').value;
   const wrap = document.getElementById('printDoItemList');
+  const selectAllRow = document.getElementById('printDoSelectAllRow');
+  const selectAllCheck = document.getElementById('printDoSelectAllCheck');
   doSelectedIds = new Set();
   updatePrintDoButtonState();
-  if(!tanggal){ wrap.innerHTML = ''; renderPrintDoPreview(); return; }
+  if(!tanggal){ wrap.innerHTML = ''; selectAllRow.style.display = 'none'; renderPrintDoPreview(); return; }
 
   const rowsForDate = poListCache.filter(po => isoDate(po['Tanggal']) === tanggal);
   if(!rowsForDate.length){
     wrap.innerHTML = '<p class="helptext">Tidak ada PO untuk tanggal ini.</p>';
+    selectAllRow.style.display = 'none';
     renderPrintDoPreview();
     return;
   }
+  selectAllRow.style.display = 'flex';
+  selectAllCheck.classList.remove('selected','sent');
 
   wrap.innerHTML = rowsForDate.map(po => {
     const wasPrinted = String(po['DO_Tercetak']).toUpperCase() === 'YA';
@@ -1622,24 +1657,43 @@ function renderPrintDoItemList(){
     </div>`;
   }).join('');
 
+  function toggleRow(row, checkEl){
+    const id = row.dataset.id;
+    const wasPrinted = checkEl.dataset.wasSent === 'true';
+    if(doSelectedIds.has(id)){
+      doSelectedIds.delete(id);
+      checkEl.classList.remove('selected');
+      checkEl.classList.toggle('sent', wasPrinted);
+    } else {
+      doSelectedIds.add(id);
+      checkEl.classList.remove('sent');
+      checkEl.classList.add('selected');
+    }
+  }
+
   wrap.querySelectorAll('.wa-item-row').forEach(row => {
     const checkEl = row.querySelector('.wa-check');
     checkEl.addEventListener('click', () => {
-      const id = row.dataset.id;
-      const wasPrinted = checkEl.dataset.wasSent === 'true';
-      if(doSelectedIds.has(id)){
-        doSelectedIds.delete(id);
-        checkEl.classList.remove('selected');
-        checkEl.classList.toggle('sent', wasPrinted);
-      } else {
-        doSelectedIds.add(id);
-        checkEl.classList.remove('sent');
-        checkEl.classList.add('selected');
-      }
+      toggleRow(row, checkEl);
+      selectAllCheck.classList.toggle('selected', doSelectedIds.size === rowsForDate.length);
       updatePrintDoButtonState();
       renderPrintDoPreview();
     });
   });
+
+  selectAllCheck.addEventListener('click', () => {
+    const allSelected = doSelectedIds.size === rowsForDate.length;
+    wrap.querySelectorAll('.wa-item-row').forEach(row => {
+      const checkEl = row.querySelector('.wa-check');
+      const isSelected = checkEl.classList.contains('selected');
+      if(allSelected && isSelected) toggleRow(row, checkEl);
+      else if(!allSelected && !isSelected) toggleRow(row, checkEl);
+    });
+    selectAllCheck.classList.toggle('selected', !allSelected);
+    updatePrintDoButtonState();
+    renderPrintDoPreview();
+  });
+
   renderPrintDoPreview();
 }
 
@@ -1910,7 +1964,7 @@ function buildInvoiceDoc(d){
 
   // Header kanan: nomor surat & hal -- posisi sejajar border kiri kolom Satuan, teks rata KIRI
   doc.text('Nomor Surat : ' + d.nomorSurat, satuanLeftX, y);
-  doc.text('Hal : Tagihan Bahan Baku periode ' + d.tanggalLabel, satuanLeftX, y+6);
+  doc.text('Hal : Tagihan Bahan Baku ' + d.tanggalLabel, satuanLeftX, y+6);
 
   y += 26;
 
