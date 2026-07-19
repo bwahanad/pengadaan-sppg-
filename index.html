@@ -1730,7 +1730,7 @@ function buildInvoiceDoc(d){
   const doc = new jsPDF({ unit:'mm', format:'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const marginL = 20, marginR = 20;
-  let y = 22;
+  let y = 50; // margin atas 50mm -- menyisakan ruang lebih lebar untuk kop surat
 
   // Lebar kolom tabel (dipakai juga untuk menyelaraskan Nomor Surat/Hal ke border kiri kolom Satuan)
   const COL_NO = 12, COL_SATUAN = 22, COL_HARGA = 32, COL_JUMLAH = 32;
