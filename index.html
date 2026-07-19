@@ -1736,6 +1736,12 @@ function buildInvoiceDoc(d){
   const COL_NO = 12, COL_SATUAN = 22, COL_HARGA = 32, COL_JUMLAH = 32;
   const satuanLeftX = (pageWidth - marginR) - (COL_SATUAN + COL_HARGA + COL_JUMLAH);
 
+  // Judul "TAGIHAN" -- tengah halaman, di atas baris Kepada Yth / Nomor Surat
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(16);
+  doc.text('TAGIHAN', pageWidth/2, y, { align:'center' });
+  y += 12;
+
   doc.setFont('helvetica','normal');
   doc.setFontSize(11);
 
@@ -1767,7 +1773,7 @@ function buildInvoiceDoc(d){
     theme: 'grid',
     styles: { fontSize: 10, cellPadding: 2 },
     headStyles: { fillColor: [47,74,52], textColor: 255, fontStyle: 'bold' },
-    footStyles: { fillColor: [240,241,236], textColor: [30,42,32], fontStyle: 'bold' },
+    footStyles: { fillColor: [240,241,236], textColor: [30,42,32], fontStyle: 'bold', halign: 'right' },
     columnStyles: {
       0: { cellWidth: COL_NO, halign:'center' },
       1: { cellWidth: 'auto' },
