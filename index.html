@@ -1335,7 +1335,6 @@ function sortItemsForDisplay(list){
 async function loadItemMaster(){
   const canManageDescriptive = ['admin','keuangan'].includes(state.role);
   const canEditModal = ['admin','suplier'].includes(state.role);
-  const canSeeModal = ['admin','suplier','investor'].includes(state.role);
   const canDelete = ['admin','keuangan'].includes(state.role);
   document.getElementById('itemFormCard').style.display = canManageDescriptive ? 'block' : 'none';
 
@@ -1346,17 +1345,17 @@ async function loadItemMaster(){
 
   const head = document.getElementById('itemTableHead');
   head.innerHTML = `<th>Item</th><th>Satuan</th><th>Group</th><th>Kategori</th>
-    ${canSeeModal ? '<th class="right">Unit Price</th>' : ''}
+    <th class="right">Unit Price</th>
     ${(canManageDescriptive||canDelete) ? '<th></th>' : ''}`;
 
   const tb = document.getElementById('itemTableBody'); tb.innerHTML = '';
-  const colCount = 4 + (canSeeModal?1:0) + ((canManageDescriptive||canDelete)?1:0);
+  const colCount = 5 + ((canManageDescriptive||canDelete)?1:0);
   if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Belum ada item</td></tr>`; return; }
   list.forEach(it => {
     const tr = document.createElement('tr');
-    const modalCell = canSeeModal ? `<td data-label="Unit Price" class="right">${canEditModal
-      ? `<input class="price-input mono item-modal-input" type="number" value="${it['Unit Price']||''}" placeholder="modal" data-id="${it['ID']}" data-nama="${it['Item']}">`
-      : `<span class="num">${it['Unit Price'] ? fmtRupiah(it['Unit Price']) : '-'}</span>`}</td>` : '';
+    const modalCell = `<td data-label="Unit Price" class="right">${canEditModal
+      ? `<input class="price-input mono item-modal-input" type="number" value="${it['Unit Price']||''}" placeholder="isi" data-id="${it['ID']}" data-nama="${it['Item']}">`
+      : `<span class="num">${it['Unit Price'] ? fmtRupiah(it['Unit Price']) : '-'}</span>`}</td>`;
     const actionCell = (canManageDescriptive||canDelete) ? `<td data-label="">
       ${canManageDescriptive ? `<button class="btn btn-ghost btn-sm edit-item-btn" data-id="${it['ID']}">Edit</button>` : ''}
       ${canDelete ? `<button class="btn btn-ghost btn-sm delete-item-btn" data-id="${it['ID']}">Hapus</button>` : ''}
@@ -1379,9 +1378,9 @@ async function loadItemMaster(){
           const result = await api('saveItemModal', { data:{ ID: inp.dataset.id, Item: inp.dataset.nama, 'Unit Price': Number(inp.value) } });
           const typed = Number(inp.value) || 0;
           if(result.price > typed){
-            toast(`Modal tersimpan sebagai ${fmtRupiah(result.price)} (harga tertinggi yang pernah diinput, bukan angka barusan)`);
+            toast(`Tersimpan sebagai ${fmtRupiah(result.price)} (harga tertinggi yang pernah diinput, bukan angka barusan)`);
           } else {
-            toast('Modal tersimpan');
+            toast('Unit Price tersimpan');
           }
           loadItemMaster();
         }
@@ -2082,6 +2081,7 @@ async function loadLaporan(){
   try{ data = await api('getLaporan', { from, to }); } catch(e){ toast(e.message, true); return; }
   const s = data.summary;
   const canSeeModal = s.totalModal !== null && s.totalModal !== undefined;
+  // Harga Satuan/Jumlah (referensi Item Master) BUKAN modal -- selalu dikirim backend, jadi selalu ditampilkan.
   document.getElementById('lapSummary').innerHTML = `
     <div class="summary-item"><div class="label">Total Belanja</div><div class="value">${fmtRupiah(s.totalBelanja)}</div></div>
     ${canSeeModal ? `
@@ -2091,9 +2091,10 @@ async function loadLaporan(){
   `;
   const head = document.getElementById('lapTableHead');
   head.innerHTML = `<th>Tanggal</th><th>Item</th><th class="right">Qty</th><th class="right">Total Belanja</th>
-    ${canSeeModal ? '<th class="right">Harga Satuan</th><th class="right">Jumlah</th><th class="right">Modal</th><th class="right">Margin</th>' : ''}`;
+    <th class="right">Harga Satuan</th><th class="right">Jumlah</th>
+    ${canSeeModal ? '<th class="right">Modal</th><th class="right">Margin</th>' : ''}`;
   const tb = document.getElementById('lapTableBody'); tb.innerHTML = '';
-  const colCount = 4 + (canSeeModal?4:0);
+  const colCount = 6 + (canSeeModal?2:0);
   if(!data.rows.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Tidak ada data pada rentang ini</td></tr>`; return; }
   data.rows.forEach(r => {
     const tr = document.createElement('tr');
@@ -2102,9 +2103,9 @@ async function loadLaporan(){
       <td data-label="Item"><span class="po-item-name">${r['Item']}</span></td>
       <td data-label="Qty" class="right num">${r['Qty']}</td>
       <td data-label="Total Belanja" class="right num">${fmtRupiah(r['Total Belanja'])}</td>
-      ${canSeeModal ? `
       <td data-label="Harga Satuan" class="right num">${fmtRupiah(r['Harga Satuan Item'])}</td>
       <td data-label="Jumlah" class="right num">${fmtRupiah(r['Jumlah Item'])}</td>
+      ${canSeeModal ? `
       <td data-label="Modal" class="right num">${fmtRupiah(r['Total Modal'])}</td>
       <td data-label="Margin" class="right num">${fmtRupiah(r['Margin'])}</td>` : ''}
     `;
