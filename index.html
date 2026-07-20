@@ -330,7 +330,7 @@
           <button class="refresh-btn" onclick="refreshView(this, loadPM)" title="Refresh">↻</button>
         </div>
         <div class="table-wrap"><table>
-          <thead><tr><th>ID PM</th><th>Periode</th><th class="right">Kuota</th><th class="right">Realisasi</th><th class="right">Selisih</th></tr></thead>
+          <thead><tr><th>ID PM</th><th>Periode</th><th class="right">Kuota</th><th class="right">Realisasi</th><th class="right">Selisih</th><th></th></tr></thead>
           <tbody id="pmTableBody"></tbody>
         </table></div>
       </div>
@@ -997,19 +997,45 @@ async function loadPM(){
   pmListCache = list;
   if(canEdit){ restorePmFormDefaults(); checkExistingPmForDates(); }
   const tb = document.getElementById('pmTableBody'); tb.innerHTML = '';
-  if(!list.length){ tb.innerHTML = '<tr><td colspan="5" class="empty">Belum ada data PM</td></tr>'; }
+  const colCount = canEdit ? 6 : 5;
+  if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Belum ada data PM</td></tr>`; }
   list.forEach(pm => {
     const tr = document.createElement('tr');
+    const aksiCell = canEdit ? `<td data-label=""><button class="btn btn-ghost btn-sm edit-pm-btn">Edit</button> <button class="btn btn-ghost btn-sm delete-pm-btn">Hapus</button></td>` : '';
     tr.innerHTML = `
       <td data-label="ID PM" class="mono">${pm['ID PM']}</td>
       <td data-label="Periode">${fmtDate(pm['Mulai'])} – ${fmtDate(pm['Sampai'])}</td>
       <td data-label="Kuota" class="right num">${fmtRupiah(pm['Kuota Belanja'])}</td>
       <td data-label="Realisasi" class="right num">${fmtRupiah(pm['Realisasi Belanja'])}</td>
       <td data-label="Selisih" class="right num" style="color:${pm['Selisih']<0?'var(--danger)':'var(--ok)'}">${fmtRupiah(pm['Selisih'])}</td>
+      ${aksiCell}
     `;
+    if(canEdit){
+      tr.querySelector('.edit-pm-btn').addEventListener('click', () => startEditPm(pm));
+      tr.querySelector('.delete-pm-btn').addEventListener('click', async () => {
+        if(!(await showConfirm('Hapus PM ' + pm['ID PM'] + '? Data yang dihapus tidak bisa dikembalikan.'))) return;
+        try{ await api('deletePM', { id: pm['ID PM'] }); toast('PM dihapus'); loadPM(); }
+        catch(e){ toast(e.message, true); }
+      });
+    }
     tb.appendChild(tr);
   });
   loadPmDropdownForPO(list);
+}
+
+/** Isi form dari baris PM yang dipilih lewat tombol Edit -- langsung masuk mode edit tanpa perlu pilih tanggal manual. */
+function startEditPm(pm){
+  document.getElementById('pmMulai').value = isoDate(pm['Mulai']);
+  document.getElementById('pmSampai').value = isoDate(pm['Sampai']);
+  editingPmId = pm['ID PM'];
+  HARI.forEach(h => {
+    document.getElementById('pk_'+h).value = pm['PM kecil '+HARI_LABEL[h]] || 0;
+    document.getElementById('pb_'+h).value = pm['PM Besar '+HARI_LABEL[h]] || 0;
+  });
+  document.getElementById('savePmBtn').textContent = 'Update PM';
+  document.getElementById('pmEditInfo').textContent = `Mengedit PM yang sudah ada (${pm['ID PM']})`;
+  updatePmKuotaPreview();
+  document.getElementById('pmFormCard').scrollIntoView({behavior:'smooth'});
 }
 
 /** Cek apakah rentang [mulai, sampai] beririsan dengan periode PM manapun yang sudah ada. */
