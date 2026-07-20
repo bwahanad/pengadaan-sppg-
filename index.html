@@ -486,12 +486,14 @@
             <select id="newUserRole">
               <option value="suplier">Suplier (isi harga &amp; modal)</option>
               <option value="keuangan">Pengawas Keuangan (PM/PO/Item)</option>
+              <option value="do_maker">DO Maker (cetak DO saja, tanpa lihat harga)</option>
               <option value="dapur">Monitoring (read-only)</option>
               <option value="investor">Investor (lihat semua termasuk modal, read-only)</option>
               <option value="admin">admin (akses penuh 1 SPPG)</option>
             </select>
           </div>
           <div class="field"><label>Posisi</label><input type="text" id="newUserPosisi" placeholder="mis. Kepala SPPG / Direktur"></div>
+          <div class="field"><label>Institusi</label><input type="text" id="newUserInstitusi" placeholder="mis. BGN / UD / Mitra"></div>
           <div class="field"><label>No. WhatsApp / No. HP Pemilik UD</label><input type="text" id="newUserWa"></div>
           <div class="field"><label>Nama Pemilik UD <span style="font-weight:400;">(khusus Suplier)</span></label><input type="text" id="newUserNamaPemilik"></div>
           <div class="field"><label>Email UD <span style="font-weight:400;">(khusus Suplier, untuk invoice)</span></label><input type="email" id="newUserEmailUD"></div>
@@ -500,7 +502,7 @@
           <div class="field" style="flex:0;" id="cancelEditUserWrap"><label>&nbsp;</label><button class="btn btn-ghost" id="cancelEditUserBtn" type="button" style="display:none;">Batal Edit</button></div>
         </div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Email</th><th>Nama</th><th>Posisi</th><th>Role</th><th>No. WA</th><th>SPPG</th><th>Aktif</th><th></th></tr></thead>
+          <thead><tr><th>Email</th><th>Nama</th><th>Posisi</th><th>Institusi</th><th>Role</th><th>No. WA</th><th>SPPG</th><th>Aktif</th><th></th></tr></thead>
           <tbody id="usersTableBody"></tbody>
         </table></div>
       </div>
@@ -891,8 +893,8 @@ async function boot(){
 
 const TAB_DEFS = [
   { id:'approval', label:'Persetujuan SPPG', roles:['superadmin'] },
-  { id:'pm', label:'PM', roles:['admin','keuangan','suplier','dapur','investor'] },
-  { id:'po', label:'PO', roles:['admin','keuangan','suplier','dapur','investor'] },
+  { id:'pm', label:'PM', roles:['admin','keuangan','suplier','dapur','investor','do_maker'] },
+  { id:'po', label:'PO', roles:['admin','keuangan','suplier','dapur','investor','do_maker'] },
   { id:'item', label:'Item Master', roles:['admin','keuangan','suplier','investor'] },
   { id:'laporan', label:'Laporan', roles:['admin','keuangan','suplier','investor'] },
   { id:'users', label:'Kelola User', roles:['admin','superadmin'] }
@@ -1125,11 +1127,12 @@ let poListCache = [];
 
 async function loadPO(){
   const canCreate = ['admin','keuangan'].includes(state.role);
-  const canPrint = ['admin','suplier'].includes(state.role);
+  const canPrintDo = ['admin','suplier','do_maker'].includes(state.role);
+  const canInvoice = ['admin','suplier'].includes(state.role);
   document.getElementById('poFormCard').style.display = canCreate ? 'block' : 'none';
   document.getElementById('openWaSendBtn').style.display = canCreate ? 'inline-flex' : 'none';
-  document.getElementById('openPrintDoBtn').style.display = canPrint ? 'inline-flex' : 'none';
-  document.getElementById('openInvoiceBtn').style.display = canPrint ? 'inline-flex' : 'none';
+  document.getElementById('openPrintDoBtn').style.display = canPrintDo ? 'inline-flex' : 'none';
+  document.getElementById('openInvoiceBtn').style.display = canInvoice ? 'inline-flex' : 'none';
 
   // Ambil Item master & daftar PO SEKALIGUS (paralel), bukan bergantian -- lebih cepat
   const [itemsResult, poResult] = await Promise.allSettled([
@@ -2142,6 +2145,7 @@ async function loadUsers(){
       <td data-label="Email">${u.Email}</td>
       <td data-label="Nama">${u.Nama}</td>
       <td data-label="Posisi">${u.Posisi || '-'}</td>
+      <td data-label="Institusi">${u.Institusi || '-'}</td>
       <td data-label="Role">${u.Role}</td>
       <td data-label="No. WA">${u.NoWA || '-'}</td>
       <td data-label="SPPG">${sppgLabel}</td>
@@ -2151,7 +2155,7 @@ async function loadUsers(){
     tr.querySelector('.edit-user-btn').addEventListener('click', () => startEditUser(u));
     tr.querySelector('.toggle-active').addEventListener('click', async () => {
       const newAktif = String(u.Aktif).toUpperCase()==='YA' ? 'TIDAK' : 'YA';
-      try{ await api('saveUser', { data:{ Email:u.Email, Nama:u.Nama, Role:u.Role, SPPG_ID:u.SPPG_ID, Aktif:newAktif, Posisi:u.Posisi, NoWA:u.NoWA, NamaPemilikUD:u.NamaPemilikUD, EmailUD:u.EmailUD } }); loadUsers(); }
+      try{ await api('saveUser', { data:{ Email:u.Email, Nama:u.Nama, Role:u.Role, SPPG_ID:u.SPPG_ID, Aktif:newAktif, Posisi:u.Posisi, NoWA:u.NoWA, NamaPemilikUD:u.NamaPemilikUD, EmailUD:u.EmailUD, Institusi:u.Institusi } }); loadUsers(); }
       catch(e){ toast(e.message, true); }
     });
     tb.appendChild(tr);
@@ -2165,6 +2169,7 @@ function startEditUser(u){
   document.getElementById('newUserNama').value = u.Nama || '';
   document.getElementById('newUserRole').value = u.Role;
   document.getElementById('newUserPosisi').value = u.Posisi || '';
+  document.getElementById('newUserInstitusi').value = u.Institusi || '';
   document.getElementById('newUserWa').value = u.NoWA || '';
   document.getElementById('newUserNamaPemilik').value = u.NamaPemilikUD || '';
   document.getElementById('newUserEmailUD').value = u.EmailUD || '';
@@ -2183,6 +2188,7 @@ function resetUserForm(){
   document.getElementById('newUserEmail').value = '';
   document.getElementById('newUserNama').value = '';
   document.getElementById('newUserPosisi').value = '';
+  document.getElementById('newUserInstitusi').value = '';
   document.getElementById('newUserWa').value = '';
   document.getElementById('newUserNamaPemilik').value = '';
   document.getElementById('newUserEmailUD').value = '';
@@ -2199,6 +2205,7 @@ document.getElementById('addUserBtn').addEventListener('click', async () => {
     Nama: document.getElementById('newUserNama').value.trim(),
     Role: document.getElementById('newUserRole').value,
     Posisi: document.getElementById('newUserPosisi').value.trim(),
+    Institusi: document.getElementById('newUserInstitusi').value.trim(),
     NoWA: document.getElementById('newUserWa').value.trim(),
     NamaPemilikUD: document.getElementById('newUserNamaPemilik').value.trim(),
     EmailUD: document.getElementById('newUserEmailUD').value.trim(),
