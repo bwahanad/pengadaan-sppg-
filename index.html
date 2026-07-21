@@ -296,7 +296,7 @@
     <!-- ============ PM VIEW ============ -->
     <section class="view" id="view-pm">
       <div class="card" id="pmFormCard" style="display:none;">
-        <h2>Buat / Edit PM <span class="tag">Penerima Manfaat</span></h2>
+        <h2>Buat PM <span class="tag">Penerima Manfaat</span></h2>
         <div class="row">
           <div class="field"><label>Mulai</label><input type="date" id="pmMulai"></div>
           <div class="field"><label>Sampai</label><input type="date" id="pmSampai"></div>
@@ -321,7 +321,10 @@
           Kuota Belanja (otomatis): <span class="mono" id="pmKuotaPreview" style="font-weight:600; color:var(--ink);">Rp0</span>
         </p>
         <p id="pmEditInfo" class="helptext" style="margin:6px 0 0; color:var(--turmeric-dark); font-weight:600;"></p>
-        <div style="margin-top:14px;"><button class="btn btn-primary" id="savePmBtn">Simpan PM</button></div>
+        <div style="margin-top:14px;">
+          <button class="btn btn-primary" id="savePmBtn">Simpan PM</button>
+          <button class="btn btn-ghost" id="pmCancelEditBtn" type="button" style="display:none;">Batal Edit</button>
+        </div>
       </div>
 
       <div class="card">
@@ -995,7 +998,7 @@ async function loadPM(){
   let list = [];
   try{ list = await api('getPM', {}); }catch(e){ toast(e.message, true); }
   pmListCache = list;
-  if(canEdit){ restorePmFormDefaults(); checkExistingPmForDates(); }
+  if(canEdit){ restorePmFormDefaults(); }
   const tb = document.getElementById('pmTableBody'); tb.innerHTML = '';
   const colCount = canEdit ? 6 : 5;
   if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Belum ada data PM</td></tr>`; }
@@ -1034,6 +1037,7 @@ function startEditPm(pm){
   });
   document.getElementById('savePmBtn').textContent = 'Update PM';
   document.getElementById('pmEditInfo').textContent = `Mengedit PM yang sudah ada (${pm['ID PM']})`;
+  document.getElementById('pmCancelEditBtn').style.display = 'inline-flex';
   updatePmKuotaPreview();
   document.getElementById('pmFormCard').scrollIntoView({behavior:'smooth'});
 }
@@ -1049,34 +1053,13 @@ function findOverlappingPm(mulai, sampai){
   });
 }
 
-/**
- * Kalau tanggal Mulai/Sampai yang dipilih PERSIS SAMA dengan PM yang sudah ada, tarik otomatis
- * nilai kecil/besar yang sudah tersimpan untuk periode itu (mode edit), bukan dibiarkan kosong.
- */
-function checkExistingPmForDates(){
-  const mulai = document.getElementById('pmMulai').value;
-  const sampai = document.getElementById('pmSampai').value;
-  const info = document.getElementById('pmEditInfo');
-  if(!mulai || !sampai){ editingPmId = null; document.getElementById('savePmBtn').textContent = 'Simpan PM'; info.textContent = ''; return; }
-
-  const match = pmListCache.find(pm => isoDate(pm['Mulai']) === mulai && isoDate(pm['Sampai']) === sampai);
-  if(match){
-    editingPmId = match['ID PM'];
-    HARI.forEach(h => {
-      document.getElementById('pk_'+h).value = match['PM kecil '+HARI_LABEL[h]] || 0;
-      document.getElementById('pb_'+h).value = match['PM Besar '+HARI_LABEL[h]] || 0;
-    });
-    document.getElementById('savePmBtn').textContent = 'Update PM';
-    info.textContent = `Mengedit PM yang sudah ada untuk periode ini (${match['ID PM']})`;
-  } else {
-    editingPmId = null;
-    document.getElementById('savePmBtn').textContent = 'Simpan PM';
-    info.textContent = '';
-  }
-  updatePmKuotaPreview();
+/** Batal mode edit -- balik ke form "Buat PM" kosong. */
+function cancelEditPm(){
+  editingPmId = null;
+  document.getElementById('savePmBtn').textContent = 'Simpan PM';
+  document.getElementById('pmEditInfo').textContent = '';
+  document.getElementById('pmCancelEditBtn').style.display = 'none';
 }
-document.getElementById('pmMulai').addEventListener('change', checkExistingPmForDates);
-document.getElementById('pmSampai').addEventListener('change', checkExistingPmForDates);
 
 const PM_FIELD_IDS = ['pmMulai','pmSampai','pk_sen','pk_sel','pk_rab','pk_kam','pk_jum','pk_sab','pb_sen','pb_sel','pb_rab','pb_kam','pb_jum','pb_sab'];
 function pmDefaultsStorageKey(){ return 'pmFormDefaults_' + (state.sppgId || 'unknown'); }
@@ -1097,6 +1080,8 @@ function restorePmFormDefaults(){
   });
   updatePmKuotaPreview();
 }
+
+document.getElementById('pmCancelEditBtn').addEventListener('click', cancelEditPm);
 
 document.getElementById('savePmBtn').addEventListener('click', async () => {
   const mulai = document.getElementById('pmMulai').value;
@@ -1125,6 +1110,7 @@ document.getElementById('savePmBtn').addEventListener('click', async () => {
       toast('PM tersimpan');
     }
     savePmFormDefaults();
+    cancelEditPm(); // reset ke mode "Buat PM" bersih setelah simpan
     loadPM();
   }
   catch(e){ toast(e.message, true); }
