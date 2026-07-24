@@ -1977,8 +1977,11 @@ document.getElementById('invoiceConfirmBtn').addEventListener('click', async () 
   if(!nomorSurat){ toast('Isi nomor surat', true); return; }
   if(!kota){ toast('Isi nama kota', true); return; }
 
-  const rowsForDate = poListCache.filter(po => isoDate(po['Tanggal']) === tanggal);
-  if(!rowsForDate.length){ toast('Tidak ada PO untuk tanggal ini', true); return; }
+  const rowsForDate = poListCache.filter(po =>
+    isoDate(po['Tanggal']) === tanggal &&
+    String(po['Kategori'] || '').trim().toLowerCase() === 'bahan baku'
+  );
+  if(!rowsForDate.length){ toast('Tidak ada PO bahan baku untuk tanggal ini', true); return; }
   if(!window.jspdf){ toast('Library PDF belum termuat, coba lagi sebentar', true); return; }
 
   try{ localStorage.setItem('invoiceKota_' + state.sppgId, kota); }catch(e){}
