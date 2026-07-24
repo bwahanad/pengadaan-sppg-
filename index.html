@@ -427,6 +427,14 @@
         <div class="row" style="margin-bottom:6px;">
           <div class="field"><label>Dari</label><input type="date" id="lapFrom"></div>
           <div class="field"><label>Sampai</label><input type="date" id="lapTo"></div>
+          <div class="field">
+            <label>Kategori</label>
+            <select id="lapKategori">
+              <option value="bahan baku">Bahan Baku</option>
+              <option value="operasional">Operasional</option>
+              <option value="">Semua (Bahan Baku + Operasional)</option>
+            </select>
+          </div>
           <div class="field" style="flex:0;"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" id="lapFilterBtn">Terapkan</button></div>
         </div>
         <div class="summary-grid" id="lapSummary"></div>
@@ -2106,13 +2114,17 @@ function buildInvoiceDoc(d){
 async function loadLaporan(){
   const from = document.getElementById('lapFrom').value;
   const to = document.getElementById('lapTo').value;
+  const kategori = document.getElementById('lapKategori').value;
   let data;
-  try{ data = await api('getLaporan', { from, to }); } catch(e){ toast(e.message, true); return; }
+  try{ data = await api('getLaporan', { from, to, kategori }); } catch(e){ toast(e.message, true); return; }
   const s = data.summary;
   const canSeeModal = s.totalModal !== null && s.totalModal !== undefined;
+  const labelBelanja = kategori === 'bahan baku' ? 'Total Belanja (Bahan Baku)'
+    : kategori === 'operasional' ? 'Total Belanja (Operasional)'
+    : 'Total Belanja (Semua)';
   // Harga Satuan/Jumlah (referensi Item Master) BUKAN modal -- selalu dikirim backend, jadi selalu ditampilkan.
   document.getElementById('lapSummary').innerHTML = `
-    <div class="summary-item"><div class="label">Total Belanja</div><div class="value">${fmtRupiah(s.totalBelanja)}</div></div>
+    <div class="summary-item"><div class="label">${labelBelanja}</div><div class="value">${fmtRupiah(s.totalBelanja)}</div></div>
     ${canSeeModal ? `
     <div class="summary-item"><div class="label">Total Modal</div><div class="value">${fmtRupiah(s.totalModal)}</div></div>
     <div class="summary-item ${s.margin>=0?'pos':'neg'}"><div class="label">Margin</div><div class="value">${fmtRupiah(s.margin)}</div></div>
