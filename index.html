@@ -475,6 +475,17 @@
 
     <!-- ============ ADMIN: USERS ============ -->
     <section class="view" id="view-users">
+      <div class="card" id="sppgLinkCard" style="display:none;">
+        <div class="card-head">
+          <h2 id="sppgLinkTitle">Link Google Sheet Dapur Ini</h2>
+        </div>
+        <div class="row">
+          <div class="field" style="flex:3;"><input type="text" id="sppgLinkInput" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
+          <div class="field" style="flex:0;"><button class="btn btn-primary" id="saveSppgLinkBtn">Simpan Link</button></div>
+        </div>
+        <p class="helptext" style="margin:8px 0 0;">Kalau diubah, sistem otomatis cek dulu apakah spreadsheet-nya bisa dibuka & siapkan sheet PO/Item/PM di sana kalau belum ada.</p>
+      </div>
+
       <div class="card">
         <div class="card-head">
           <h2>Kelola User <span class="tag" id="usersTag">SPPG Aktif</span></h2>
@@ -2147,6 +2158,25 @@ async function loadUsers(){
     sppgSel.disabled = true;
   }
 
+  // Kartu "Link Google Sheet" hanya muncul kalau ada 1 SPPG konkret yang sedang aktif
+  // (bukan mode "Admin Pusat / Semua SPPG" milik superadmin).
+  const linkCard = document.getElementById('sppgLinkCard');
+  if(state.sppgId){
+    try{
+      const freshList = await api('getSppgList', {});
+      const current = freshList.find(s => s.ID_SPPG === state.sppgId);
+      if(current){
+        document.getElementById('sppgLinkTitle').textContent = 'Link Google Sheet — ' + current.Nama_SPPG;
+        document.getElementById('sppgLinkInput').value = 'https://docs.google.com/spreadsheets/d/' + current.Spreadsheet_ID + '/edit';
+        linkCard.style.display = 'block';
+      } else {
+        linkCard.style.display = 'none';
+      }
+    } catch(e){ linkCard.style.display = 'none'; }
+  } else {
+    linkCard.style.display = 'none';
+  }
+
   let list = [];
   try{ list = await api('getUsers', {}); } catch(e){ toast(e.message, true); return; }
   const tb = document.getElementById('usersTableBody'); tb.innerHTML = '';
@@ -2209,6 +2239,27 @@ function resetUserForm(){
   document.getElementById('userFormMode').textContent = '';
 }
 document.getElementById('cancelEditUserBtn').addEventListener('click', resetUserForm);
+
+document.getElementById('saveSppgLinkBtn').addEventListener('click', async () => {
+  const link = document.getElementById('sppgLinkInput').value.trim();
+  if(!link){ toast('Isi link spreadsheet-nya dulu', true); return; }
+
+  const btn = document.getElementById('saveSppgLinkBtn');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'Memeriksa...';
+  try{
+    await api('saveSppg', { data: { ID_SPPG: state.sppgId, Spreadsheet_ID: link } });
+    toast('Link spreadsheet diperbarui');
+    await refreshSuperadminOptions();
+    loadUsers();
+  } catch(e){
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+});
 
 document.getElementById('addUserBtn').addEventListener('click', async () => {
   const isSuperadmin = state.role === 'superadmin';
