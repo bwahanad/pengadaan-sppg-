@@ -359,6 +359,14 @@
             <button class="refresh-btn" onclick="refreshView(this, loadPO)" title="Refresh">↻</button>
           </div>
         </div>
+        <div id="poActivePmSummary" style="display:none; margin-bottom:14px;">
+          <div class="helptext" id="poActivePmLabel" style="margin-bottom:6px;"></div>
+          <div class="summary-grid">
+            <div class="summary-item"><div class="label">Kuota</div><div class="value" id="poPmKuota">Rp0</div></div>
+            <div class="summary-item"><div class="label">Realisasi</div><div class="value" id="poPmRealisasi">Rp0</div></div>
+            <div class="summary-item" id="poPmSelisihCard"><div class="label">Selisih</div><div class="value" id="poPmSelisih">Rp0</div></div>
+          </div>
+        </div>
         <div class="table-wrap"><table class="compact-table">
           <thead><tr id="poTableHead"></tr></thead>
           <tbody id="poTableBody"></tbody>
@@ -1165,10 +1173,11 @@ async function loadPO(){
   document.getElementById('openPrintDoBtn').style.display = canPrintDo ? 'inline-flex' : 'none';
   document.getElementById('openInvoiceBtn').style.display = canInvoice ? 'inline-flex' : 'none';
 
-  // Ambil Item master & daftar PO SEKALIGUS (paralel), bukan bergantian -- lebih cepat
-  const [itemsResult, poResult] = await Promise.allSettled([
+  // Ambil Item master, daftar PO, & daftar PM SEKALIGUS (paralel), bukan bergantian -- lebih cepat
+  const [itemsResult, poResult, pmResult] = await Promise.allSettled([
     api('getItems', {}),
-    api('getPO', {})
+    api('getPO', {}),
+    api('getPM', {})
   ]);
   itemMasterCache = itemsResult.status === 'fulfilled' ? itemsResult.value : [];
   if(canCreate && !document.getElementById('poFormRows').children.length) addPoRow();
@@ -1176,12 +1185,36 @@ async function loadPO(){
   if(poResult.status !== 'fulfilled'){ toast(poResult.reason?.message || 'Gagal memuat PO', true); return; }
   poListCache = poResult.value;
   renderPOTable(poListCache);
+
+  if(pmResult.status === 'fulfilled'){
+    pmListCache = pmResult.value;
+    renderActivePmSummary();
+  }
+}
+
+/** Tampilkan ringkasan Kuota/Realisasi/Selisih dari PM yang periodenya mencakup hari ini, di atas Daftar PO. */
+function renderActivePmSummary(){
+  const wrap = document.getElementById('poActivePmSummary');
+  const todayStr = isoDate(new Date());
+  const active = pmListCache.find(pm => todayStr >= isoDate(pm['Mulai']) && todayStr <= isoDate(pm['Sampai']));
+  if(!active){ wrap.style.display = 'none'; return; }
+
+  document.getElementById('poActivePmLabel').innerHTML =
+    `<b>${active['ID PM']}</b> · ${fmtDate(active['Mulai'])} – ${fmtDate(active['Sampai'])} (periode berjalan)`;
+  document.getElementById('poPmKuota').textContent = fmtRupiah(active['Kuota Belanja']);
+  document.getElementById('poPmRealisasi').textContent = fmtRupiah(active['Realisasi Belanja']);
+  const selisihEl = document.getElementById('poPmSelisih');
+  const selisihCard = document.getElementById('poPmSelisihCard');
+  selisihEl.textContent = fmtRupiah(active['Selisih']);
+  selisihCard.className = 'summary-item ' + (Number(active['Selisih']) < 0 ? 'neg' : 'pos');
+  wrap.style.display = 'block';
 }
 
 function renderPOTable(list){
   const canFillPrice = ['admin','suplier'].includes(state.role);
   const canSeeModal = ['admin','suplier','investor'].includes(state.role);
   const canEditModal = ['admin','suplier'].includes(state.role);
+  const canEditQty = ['admin','keuangan'].includes(state.role);
   const canDelete = ['admin','keuangan'].includes(state.role);
   const canEditPO = canFillPrice; // suplier & admin -> klik baris buka popup isi harga & modal sekaligus
 
@@ -1224,6 +1257,9 @@ function renderPOTable(list){
       const priceCell = canFillPrice
         ? `<span class="tap-value ${po['Unit Price']?'':'tap-value-empty'}">${po['Unit Price'] ? fmtRupiah(po['Unit Price']) : 'Tap isi'}</span>`
         : `<span class="num">${po['Unit Price'] ? fmtRupiah(po['Unit Price']) : '-'}</span>`;
+      const qtyCell = canEditQty
+        ? `<input type="number" class="price-input mono qty-input" value="${po['Qty']}" data-id="${po['ID']}">`
+        : `${po['Qty']}`;
       const modalCells = canSeeModal ? `
         <td data-label="Modal/Unit" class="right">${canEditModal
           ? `<span class="tap-value ${po['Modal Per Unit']?'':'tap-value-empty'}">${po['Modal Per Unit'] ? fmtRupiah(po['Modal Per Unit']) : 'Tap isi'}</span>`
@@ -1232,7 +1268,7 @@ function renderPOTable(list){
       const deleteCell = canDelete ? `<td data-label=""><button class="btn btn-ghost btn-sm delete-po-btn" data-id="${po['ID']}" title="Hapus">✕</button></td>` : '';
       tr.innerHTML = `
         <td data-label="Item" title="${po['Item']} — ${po['Status']}"><span class="status-dot ${statusDotClass}"></span><span class="po-item-name">${po['Item']}</span></td>
-        <td data-label="Qty" class="right num">${po['Qty']}</td>
+        <td data-label="Qty" class="right num">${qtyCell}</td>
         <td data-label="Satuan">${po['Unit']}</td>
         <td data-label="Harga Satuan" class="right">${priceCell}</td>
         <td data-label="Jumlah" class="right num">${po['Total Belanja'] ? fmtRupiah(po['Total Belanja']) : '-'}</td>
@@ -1246,6 +1282,18 @@ function renderPOTable(list){
   if(canEditPO){
     tb.querySelectorAll('.po-editable-row').forEach(row => {
       row.addEventListener('click', () => openPoPriceEditor(row.dataset.id, list));
+    });
+  }
+  if(canEditQty){
+    tb.querySelectorAll('.qty-input').forEach(inp => {
+      inp.addEventListener('click', (e) => e.stopPropagation()); // jangan sampai memicu popup harga (khusus admin yang punya keduanya)
+      inp.addEventListener('change', async (e) => {
+        e.stopPropagation();
+        const newQty = Number(inp.value) || 0;
+        if(newQty <= 0){ toast('Qty harus lebih dari 0', true); loadPO(); return; }
+        try{ await api('updatePOItemQty', { id: inp.dataset.id, data:{ Qty: newQty } }); toast('Qty diperbarui'); loadPO(); }
+        catch(err){ toast(err.message, true); }
+      });
     });
   }
   if(canDelete){
