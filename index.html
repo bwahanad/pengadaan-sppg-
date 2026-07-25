@@ -359,11 +359,15 @@
             <button class="refresh-btn" onclick="refreshView(this, loadPO)" title="Refresh">↻</button>
           </div>
         </div>
+        <div class="row" style="gap:8px; margin-bottom:14px;">
+          <button class="btn btn-accent btn-sm po-kategori-btn" data-kategori="bahan baku" id="poKatBahanBakuBtn">Bahan Baku</button>
+          <button class="btn btn-ghost btn-sm po-kategori-btn" data-kategori="operasional" id="poKatOperasionalBtn">Operasional</button>
+        </div>
         <div id="poActivePmSummary" style="display:none; margin-bottom:14px;">
           <div class="helptext" id="poActivePmLabel" style="margin-bottom:6px;"></div>
           <div class="summary-grid">
-            <div class="summary-item"><div class="label">Kuota</div><div class="value" id="poPmKuota">Rp0</div></div>
-            <div class="summary-item"><div class="label">Realisasi</div><div class="value" id="poPmRealisasi">Rp0</div></div>
+            <div class="summary-item" id="poPmKuotaCard"><div class="label">Kuota</div><div class="value" id="poPmKuota">Rp0</div></div>
+            <div class="summary-item" id="poPmRealisasiCard"><div class="label">Realisasi</div><div class="value" id="poPmRealisasi">Rp0</div></div>
             <div class="summary-item" id="poPmSelisihCard"><div class="label">Selisih</div><div class="value" id="poPmSelisih">Rp0</div></div>
           </div>
         </div>
@@ -1164,6 +1168,8 @@ function loadPmDropdownForPO(list){
 
 let poListCache = [];
 
+let poKategoriFilter = 'bahan baku'; // default sesuai permintaan
+
 async function loadPO(){
   const canCreate = ['admin','keuangan'].includes(state.role);
   const canPrintDo = ['admin','suplier','do_maker'].includes(state.role);
@@ -1183,17 +1189,38 @@ async function loadPO(){
   if(canCreate && !document.getElementById('poFormRows').children.length) addPoRow();
 
   if(poResult.status !== 'fulfilled'){ toast(poResult.reason?.message || 'Gagal memuat PO', true); return; }
-  poListCache = poResult.value;
-  renderPOTable(poListCache);
+  poListCache = poResult.value; // tidak difilter kategori -- filternya dilakukan di render supaya tombol Bahan Baku/Operasional instan tanpa reload
 
   if(pmResult.status === 'fulfilled'){
     pmListCache = pmResult.value;
-    renderActivePmSummary();
   }
+  renderPoKategoriView();
 }
 
-/** Tampilkan ringkasan Kuota/Realisasi/Selisih dari PM yang periodenya mencakup hari ini, di atas Daftar PO. */
-function renderActivePmSummary(){
+/** Terapkan filter kategori (Bahan Baku/Operasional) yang sedang aktif ke ringkasan PM & tabel PO sekaligus. */
+function renderPoKategoriView(){
+  document.getElementById('poKatBahanBakuBtn').className = 'btn btn-sm po-kategori-btn ' + (poKategoriFilter === 'bahan baku' ? 'btn-accent' : 'btn-ghost');
+  document.getElementById('poKatOperasionalBtn').className = 'btn btn-sm po-kategori-btn ' + (poKategoriFilter === 'operasional' ? 'btn-accent' : 'btn-ghost');
+
+  const filtered = poListCache.filter(po => String(po['Kategori']||'').trim().toLowerCase() === poKategoriFilter);
+  renderPOTable(filtered);
+  renderActivePmSummary(filtered);
+}
+
+document.querySelectorAll('.po-kategori-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    poKategoriFilter = btn.dataset.kategori;
+    renderPoKategoriView();
+  });
+});
+
+/**
+ * Tampilkan ringkasan dari PM yang periodenya mencakup hari ini, di atas Daftar PO.
+ * Untuk Bahan Baku: Kuota/Realisasi/Selisih (dihitung server, sudah sesuai kategori bahan baku).
+ * Untuk Operasional: Kuota & Selisih disembunyikan (tidak ada konsep kuota untuk operasional),
+ * cuma tampil Total Belanja Operasional dihitung dari data PO yang sedang difilter.
+ */
+function renderActivePmSummary(filteredList){
   const wrap = document.getElementById('poActivePmSummary');
   const todayStr = isoDate(new Date());
   const active = pmListCache.find(pm => todayStr >= isoDate(pm['Mulai']) && todayStr <= isoDate(pm['Sampai']));
@@ -1201,12 +1228,30 @@ function renderActivePmSummary(){
 
   document.getElementById('poActivePmLabel').innerHTML =
     `<b>${active['ID PM']}</b> · ${fmtDate(active['Mulai'])} – ${fmtDate(active['Sampai'])} (periode berjalan)`;
-  document.getElementById('poPmKuota').textContent = fmtRupiah(active['Kuota Belanja']);
-  document.getElementById('poPmRealisasi').textContent = fmtRupiah(active['Realisasi Belanja']);
-  const selisihEl = document.getElementById('poPmSelisih');
+
+  const kuotaCard = document.getElementById('poPmKuotaCard');
   const selisihCard = document.getElementById('poPmSelisihCard');
-  selisihEl.textContent = fmtRupiah(active['Selisih']);
-  selisihCard.className = 'summary-item ' + (Number(active['Selisih']) < 0 ? 'neg' : 'pos');
+  const realisasiCard = document.getElementById('poPmRealisasiCard');
+
+  if(poKategoriFilter === 'bahan baku'){
+    kuotaCard.style.display = '';
+    selisihCard.style.display = '';
+    realisasiCard.querySelector('.label').textContent = 'Realisasi';
+    document.getElementById('poPmKuota').textContent = fmtRupiah(active['Kuota Belanja']);
+    document.getElementById('poPmRealisasi').textContent = fmtRupiah(active['Realisasi Belanja']);
+    const selisihEl = document.getElementById('poPmSelisih');
+    selisihEl.textContent = fmtRupiah(active['Selisih']);
+    selisihCard.className = 'summary-item ' + (Number(active['Selisih']) < 0 ? 'neg' : 'pos');
+  } else {
+    // Operasional: sembunyikan Kuota & Selisih, hitung Total Belanja operasional dari list yang sudah difilter
+    kuotaCard.style.display = 'none';
+    selisihCard.style.display = 'none';
+    realisasiCard.querySelector('.label').textContent = 'Total Belanja Operasional';
+    const totalOperasional = filteredList
+      .filter(po => isoDate(po['Tanggal']) >= isoDate(active['Mulai']) && isoDate(po['Tanggal']) <= isoDate(active['Sampai']))
+      .reduce((s, po) => s + (Number(po['Total Belanja']) || 0), 0);
+    document.getElementById('poPmRealisasi').textContent = fmtRupiah(totalOperasional);
+  }
   wrap.style.display = 'block';
 }
 
