@@ -927,10 +927,10 @@ async function boot(){
 
 const TAB_DEFS = [
   { id:'approval', label:'Persetujuan SPPG', roles:['superadmin'] },
-  { id:'pm', label:'PM', roles:['admin','keuangan','suplier','dapur','investor','do_maker'] },
+  { id:'pm', label:'PM', roles:['admin','keuangan'] },
   { id:'po', label:'PO', roles:['admin','keuangan','suplier','dapur','investor','do_maker'] },
-  { id:'item', label:'Item Master', roles:['admin','keuangan','suplier','investor'] },
-  { id:'laporan', label:'Laporan', roles:['admin','keuangan','suplier','investor'] },
+  { id:'item', label:'Item Master', roles:['admin','keuangan'] },
+  { id:'laporan', label:'Laporan', roles:['admin','suplier','investor'] },
   { id:'users', label:'Kelola User', roles:['admin','superadmin'] }
 ];
 
@@ -1163,7 +1163,9 @@ let itemMasterCache = [];
 
 function loadPmDropdownForPO(list){
   const sel = document.getElementById('poFormPm');
+  const prevValue = sel.value;
   sel.innerHTML = list.map(p => `<option value="${p['ID PM']}">${fmtDate(p['Mulai'])} - ${fmtDate(p['Sampai'])}</option>`).join('');
+  if(prevValue && list.some(p => p['ID PM'] === prevValue)) sel.value = prevValue;
 }
 
 let poListCache = [];
@@ -1193,11 +1195,26 @@ async function loadPO(){
 
   if(pmResult.status === 'fulfilled'){
     pmListCache = pmResult.value;
+    loadPmDropdownForPO(pmListCache); // pastikan dropdown Periode selalu terisi walau belum sempat buka tab PM
   }
   renderPoKategoriView();
 }
 
 /** Terapkan filter kategori (Bahan Baku/Operasional) yang sedang aktif ke ringkasan PM & tabel PO sekaligus. */
+/** Cari PM yang relevan untuk ringkasan: ikuti pilihan dropdown "Periode" di form Buat PO kalau ada,
+ * kalau dropdown tidak ada/tidak dipilih (mis. role tanpa akses buat PO), pakai PM yang periodenya
+ * mencakup hari ini sebagai cadangan. */
+function getSelectedPmForSummary(){
+  const formCard = document.getElementById('poFormCard');
+  const sel = document.getElementById('poFormPm');
+  if(formCard && formCard.style.display !== 'none' && sel && sel.value){
+    const match = pmListCache.find(pm => pm['ID PM'] === sel.value);
+    if(match) return match;
+  }
+  const todayStr = isoDate(new Date());
+  return pmListCache.find(pm => todayStr >= isoDate(pm['Mulai']) && todayStr <= isoDate(pm['Sampai']));
+}
+
 function renderPoKategoriView(){
   document.getElementById('poKatBahanBakuBtn').className = 'btn btn-sm po-kategori-btn ' + (poKategoriFilter === 'bahan baku' ? 'btn-accent' : 'btn-ghost');
   document.getElementById('poKatOperasionalBtn').className = 'btn btn-sm po-kategori-btn ' + (poKategoriFilter === 'operasional' ? 'btn-accent' : 'btn-ghost');
@@ -1214,20 +1231,21 @@ document.querySelectorAll('.po-kategori-btn').forEach(btn => {
   });
 });
 
+document.getElementById('poFormPm').addEventListener('change', renderPoKategoriView);
+
 /**
- * Tampilkan ringkasan dari PM yang periodenya mencakup hari ini, di atas Daftar PO.
+ * Tampilkan ringkasan dari PM yang dipilih di dropdown "Periode" (form Buat PO), di atas Daftar PO.
  * Untuk Bahan Baku: Kuota/Realisasi/Selisih (dihitung server, sudah sesuai kategori bahan baku).
  * Untuk Operasional: Kuota & Selisih disembunyikan (tidak ada konsep kuota untuk operasional),
  * cuma tampil Total Belanja Operasional dihitung dari data PO yang sedang difilter.
  */
 function renderActivePmSummary(filteredList){
   const wrap = document.getElementById('poActivePmSummary');
-  const todayStr = isoDate(new Date());
-  const active = pmListCache.find(pm => todayStr >= isoDate(pm['Mulai']) && todayStr <= isoDate(pm['Sampai']));
+  const active = getSelectedPmForSummary();
   if(!active){ wrap.style.display = 'none'; return; }
 
   document.getElementById('poActivePmLabel').innerHTML =
-    `<b>${active['ID PM']}</b> · ${fmtDate(active['Mulai'])} – ${fmtDate(active['Sampai'])} (periode berjalan)`;
+    `<b>${active['ID PM']}</b> · ${fmtDate(active['Mulai'])} – ${fmtDate(active['Sampai'])}`;
 
   const kuotaCard = document.getElementById('poPmKuotaCard');
   const selisihCard = document.getElementById('poPmSelisihCard');
@@ -1473,7 +1491,8 @@ function sortItemsForDisplay(list){
 
 async function loadItemMaster(){
   const canManageDescriptive = ['admin','keuangan'].includes(state.role);
-  const canEditModal = ['admin','suplier'].includes(state.role);
+  const canEditModal = ['admin'].includes(state.role); // suplier sudah tidak akses Item Master lagi
+  const canSeeModalRef = ['admin'].includes(state.role); // Modal Per Unit = referensi modal, dirahasiakan dari Keuangan
   const canDelete = ['admin','keuangan'].includes(state.role);
   document.getElementById('itemFormCard').style.display = canManageDescriptive ? 'block' : 'none';
 
@@ -1485,16 +1504,19 @@ async function loadItemMaster(){
   const head = document.getElementById('itemTableHead');
   head.innerHTML = `<th>Item</th><th>Satuan</th><th>Group</th><th>Kategori</th>
     <th class="right">Unit Price</th>
+    ${canSeeModalRef ? '<th class="right">Modal Per Unit <span style="font-weight:400; text-transform:none;">(ref.)</span></th>' : ''}
     ${(canManageDescriptive||canDelete) ? '<th></th>' : ''}`;
 
   const tb = document.getElementById('itemTableBody'); tb.innerHTML = '';
-  const colCount = 5 + ((canManageDescriptive||canDelete)?1:0);
+  const colCount = 5 + (canSeeModalRef?1:0) + ((canManageDescriptive||canDelete)?1:0);
   if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Belum ada item</td></tr>`; return; }
   list.forEach(it => {
     const tr = document.createElement('tr');
     const modalCell = `<td data-label="Unit Price" class="right">${canEditModal
       ? `<input class="price-input mono item-modal-input" type="number" value="${it['Unit Price']||''}" placeholder="isi" data-id="${it['ID']}" data-nama="${it['Item']}">`
       : `<span class="num">${it['Unit Price'] ? fmtRupiah(it['Unit Price']) : '-'}</span>`}</td>`;
+    const modalRefCell = canSeeModalRef
+      ? `<td data-label="Modal Per Unit" class="right num">${it['Modal Per Unit'] ? fmtRupiah(it['Modal Per Unit']) : '-'}</td>` : '';
     const actionCell = (canManageDescriptive||canDelete) ? `<td data-label="">
       ${canManageDescriptive ? `<button class="btn btn-ghost btn-sm edit-item-btn" data-id="${it['ID']}">Edit</button>` : ''}
       ${canDelete ? `<button class="btn btn-ghost btn-sm delete-item-btn" data-id="${it['ID']}">Hapus</button>` : ''}
@@ -1505,6 +1527,7 @@ async function loadItemMaster(){
       <td data-label="Group">${it['Group']||'-'}</td>
       <td data-label="Kategori">${it['Kategori']||'-'}</td>
       ${modalCell}
+      ${modalRefCell}
       ${actionCell}
     `;
     tb.appendChild(tr);
