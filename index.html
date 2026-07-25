@@ -567,11 +567,11 @@
     <p id="poPriceEditorMeta" class="helptext" style="margin:0 0 16px;">Qty · Satuan · Tanggal</p>
     <div class="field" style="margin-bottom:12px;">
       <label>Harga Satuan (Rp)</label>
-      <input type="number" id="poPriceEditorHarga" placeholder="0">
+      <input type="text" inputmode="decimal" id="poPriceEditorHarga" placeholder="0">
     </div>
     <div class="field" id="poPriceEditorModalField" style="margin-bottom:4px;">
       <label>Modal / Unit (Rp)</label>
-      <input type="number" id="poPriceEditorModal" placeholder="0">
+      <input type="text" inputmode="decimal" id="poPriceEditorModal" placeholder="0">
     </div>
     <div class="confirm-actions" style="margin-top:16px;">
       <button class="btn btn-ghost btn-sm" id="poPriceEditorCancelBtn">Batal</button>
@@ -1258,7 +1258,7 @@ function renderPOTable(list){
         ? `<span class="tap-value ${po['Unit Price']?'':'tap-value-empty'}">${po['Unit Price'] ? fmtRupiah(po['Unit Price']) : 'Tap isi'}</span>`
         : `<span class="num">${po['Unit Price'] ? fmtRupiah(po['Unit Price']) : '-'}</span>`;
       const qtyCell = canEditQty
-        ? `<input type="number" class="price-input mono qty-input" value="${po['Qty']}" data-id="${po['ID']}">`
+        ? `<input type="text" inputmode="decimal" class="price-input mono qty-input" value="${po['Qty']}" data-id="${po['ID']}">`
         : `${po['Qty']}`;
       const modalCells = canSeeModal ? `
         <td data-label="Modal/Unit" class="right">${canEditModal
@@ -1289,10 +1289,17 @@ function renderPOTable(list){
       inp.addEventListener('click', (e) => e.stopPropagation()); // jangan sampai memicu popup harga (khusus admin yang punya keduanya)
       inp.addEventListener('change', async (e) => {
         e.stopPropagation();
-        const newQty = Number(inp.value) || 0;
-        if(newQty <= 0){ toast('Qty harus lebih dari 0', true); loadPO(); return; }
+        if(inp.disabled) return; // cegah kirim ganda kalau change sempat terpicu 2x
+        const raw = inp.value.trim().replace(',', '.'); // terima format koma desimal (mis. "3,5")
+        const newQty = parseFloat(raw);
+        if(!raw || isNaN(newQty) || newQty <= 0 || newQty > 1000000){
+          toast('Qty tidak valid, harus angka lebih dari 0', true);
+          loadPO();
+          return;
+        }
+        inp.disabled = true;
         try{ await api('updatePOItemQty', { id: inp.dataset.id, data:{ Qty: newQty } }); toast('Qty diperbarui'); loadPO(); }
-        catch(err){ toast(err.message, true); }
+        catch(err){ toast(err.message, true); loadPO(); }
       });
     });
   }
@@ -1331,17 +1338,22 @@ document.getElementById('poPriceEditorCancelBtn').addEventListener('click', () =
 document.getElementById('poPriceEditorSaveBtn').addEventListener('click', async () => {
   const overlay = document.getElementById('poPriceEditorOverlay');
   const id = overlay.dataset.id;
-  const harga = document.getElementById('poPriceEditorHarga').value;
-  const modal = document.getElementById('poPriceEditorModal').value;
+  const hargaRaw = document.getElementById('poPriceEditorHarga').value.trim().replace(',', '.');
+  const modalRaw = document.getElementById('poPriceEditorModal').value.trim().replace(',', '.');
+  const harga = parseFloat(hargaRaw);
+  const modal = parseFloat(modalRaw);
   const canEditModal = ['admin','suplier'].includes(state.role);
+
+  if(hargaRaw && (isNaN(harga) || harga <= 0 || harga > 100000000)){ toast('Harga Satuan tidak valid', true); return; }
+  if(modalRaw && (isNaN(modal) || modal < 0 || modal > 100000000)){ toast('Modal/Unit tidak valid', true); return; }
 
   const btn = document.getElementById('poPriceEditorSaveBtn');
   btn.disabled = true;
   const originalText = btn.textContent;
   btn.textContent = 'Menyimpan...';
   try{
-    if(harga !== '') await api('updatePOPrice', { id, unitPrice: Number(harga) });
-    if(canEditModal && modal !== '') await api('updatePOModal', { id, modalPerUnit: Number(modal) });
+    if(hargaRaw) await api('updatePOPrice', { id, unitPrice: harga });
+    if(canEditModal && modalRaw) await api('updatePOModal', { id, modalPerUnit: modal });
     toast('Tersimpan');
     overlay.classList.remove('show');
     loadPO();
