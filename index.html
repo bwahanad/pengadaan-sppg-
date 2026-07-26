@@ -2371,7 +2371,7 @@ function buildInvoiceDoc(d){
   doc.text('Nomor Surat : ' + d.nomorSurat, satuanLeftX, y);
   doc.text('Hal : Tagihan Bahan Baku ' + d.tanggalLabel, satuanLeftX, y+6);
 
-  y += 34; // jarak antara blok "Kepada Yth" dan tabel item -- dilebarkan supaya tidak terlalu rapat
+  y += 16; // hampir tanpa jarak antara blok "Kepada Yth" dan tabel item (sesuai permintaan)
 
   // Tabel item
   let no = 0;
@@ -2400,7 +2400,7 @@ function buildInvoiceDoc(d){
       4: { cellWidth: COL_HARGA, halign:'right' },
       5: { cellWidth: COL_JUMLAH, halign:'right' }
     },
-    margin: { left: marginL, right: marginR }
+    margin: { left: marginL, right: marginR, bottom: 10 } // margin bawah kertas 1cm
   });
 
   let closingY = doc.lastAutoTable.finalY + 16;
