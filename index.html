@@ -364,7 +364,10 @@
           <button class="btn btn-ghost btn-sm po-kategori-btn" data-kategori="operasional" id="poKatOperasionalBtn">Operasional</button>
         </div>
         <div id="poActivePmSummary" style="display:none; margin-bottom:14px;">
-          <div class="helptext" id="poActivePmLabel" style="margin-bottom:6px;"></div>
+          <div class="field" style="max-width:320px; margin-bottom:10px;">
+            <label>ID PM</label>
+            <select id="poSummaryPmSelect"></select>
+          </div>
           <div class="summary-grid">
             <div class="summary-item" id="poPmKuotaCard"><div class="label">Kuota</div><div class="value" id="poPmKuota">Rp0</div></div>
             <div class="summary-item" id="poPmRealisasiCard"><div class="label">Realisasi</div><div class="value" id="poPmRealisasi">Rp0</div></div>
@@ -1195,24 +1198,36 @@ async function loadPO(){
 
   if(pmResult.status === 'fulfilled'){
     pmListCache = pmResult.value;
-    loadPmDropdownForPO(pmListCache); // pastikan dropdown Periode selalu terisi walau belum sempat buka tab PM
+    if(canCreate) loadPmDropdownForPO(pmListCache); // dropdown "Periode" di form Buat PO (khusus yang bisa buat PO)
+    populateSummaryPmSelect(pmListCache); // dropdown "ID PM" ringkasan -- untuk SEMUA role yang bisa lihat PO
   }
   renderPoKategoriView();
 }
 
-/** Terapkan filter kategori (Bahan Baku/Operasional) yang sedang aktif ke ringkasan PM & tabel PO sekaligus. */
-/** Cari PM yang relevan untuk ringkasan: ikuti pilihan dropdown "Periode" di form Buat PO kalau ada,
- * kalau dropdown tidak ada/tidak dipilih (mis. role tanpa akses buat PO), pakai PM yang periodenya
- * mencakup hari ini sebagai cadangan. */
-function getSelectedPmForSummary(){
-  const formCard = document.getElementById('poFormCard');
-  const sel = document.getElementById('poFormPm');
-  if(formCard && formCard.style.display !== 'none' && sel && sel.value){
-    const match = pmListCache.find(pm => pm['ID PM'] === sel.value);
-    if(match) return match;
+/**
+ * Isi dropdown "ID PM" ringkasan di atas Daftar PO (tersedia untuk semua role). Defaultnya PM yang
+ * periodenya mencakup tanggal HARI INI menurut jam di perangkat pengguna (laptop/Android/iOS) --
+ * bukan tanggal server -- supaya selalu pas dengan apa yang dilihat pengguna di layarnya.
+ */
+function populateSummaryPmSelect(list){
+  const sel = document.getElementById('poSummaryPmSelect');
+  const prevValue = sel.value;
+  sel.innerHTML = list.map(pm => `<option value="${pm['ID PM']}">${pm['ID PM']} · ${fmtDate(pm['Mulai'])} – ${fmtDate(pm['Sampai'])}</option>`).join('');
+
+  if(prevValue && list.some(pm => pm['ID PM'] === prevValue)){
+    sel.value = prevValue; // pertahankan pilihan pengguna kalau masih ada (mis. setelah refresh data)
+    return;
   }
-  const todayStr = isoDate(new Date());
-  return pmListCache.find(pm => todayStr >= isoDate(pm['Mulai']) && todayStr <= isoDate(pm['Sampai']));
+  const todayStr = isoDate(new Date()); // tanggal perangkat pengguna
+  const defaultPm = list.find(pm => todayStr >= isoDate(pm['Mulai']) && todayStr <= isoDate(pm['Sampai']));
+  if(defaultPm) sel.value = defaultPm['ID PM'];
+}
+
+/** Cari PM yang sedang dipilih di dropdown "ID PM" ringkasan. */
+function getSelectedPmForSummary(){
+  const sel = document.getElementById('poSummaryPmSelect');
+  if(!sel || !sel.value) return null;
+  return pmListCache.find(pm => pm['ID PM'] === sel.value);
 }
 
 function renderPoKategoriView(){
@@ -1231,21 +1246,20 @@ document.querySelectorAll('.po-kategori-btn').forEach(btn => {
   });
 });
 
-document.getElementById('poFormPm').addEventListener('change', renderPoKategoriView);
+document.getElementById('poSummaryPmSelect').addEventListener('change', renderPoKategoriView);
 
 /**
- * Tampilkan ringkasan dari PM yang dipilih di dropdown "Periode" (form Buat PO), di atas Daftar PO.
+ * Tampilkan ringkasan dari PM yang dipilih di dropdown "ID PM", di atas Daftar PO.
  * Untuk Bahan Baku: Kuota/Realisasi/Selisih (dihitung server, sudah sesuai kategori bahan baku).
  * Untuk Operasional: Kuota & Selisih disembunyikan (tidak ada konsep kuota untuk operasional),
  * cuma tampil Total Belanja Operasional dihitung dari data PO yang sedang difilter.
  */
 function renderActivePmSummary(filteredList){
   const wrap = document.getElementById('poActivePmSummary');
+  if(!pmListCache.length){ wrap.style.display = 'none'; return; }
   const active = getSelectedPmForSummary();
   if(!active){ wrap.style.display = 'none'; return; }
-
-  document.getElementById('poActivePmLabel').innerHTML =
-    `<b>${active['ID PM']}</b> · ${fmtDate(active['Mulai'])} – ${fmtDate(active['Sampai'])}`;
+  wrap.style.display = 'block';
 
   const kuotaCard = document.getElementById('poPmKuotaCard');
   const selisihCard = document.getElementById('poPmSelisihCard');
@@ -1270,7 +1284,6 @@ function renderActivePmSummary(filteredList){
       .reduce((s, po) => s + (Number(po['Total Belanja']) || 0), 0);
     document.getElementById('poPmRealisasi').textContent = fmtRupiah(totalOperasional);
   }
-  wrap.style.display = 'block';
 }
 
 function renderPOTable(list){
