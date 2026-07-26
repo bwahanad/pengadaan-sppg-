@@ -1210,11 +1210,13 @@ async function loadPO(){
   document.getElementById('openPrintDoBtn').style.display = canPrintDo ? 'inline-flex' : 'none';
   document.getElementById('openInvoiceBtn').style.display = canInvoice ? 'inline-flex' : 'none';
 
-  // Ambil Item master, daftar PO, & daftar PM SEKALIGUS (paralel), bukan bergantian -- lebih cepat
+  // Ambil Item master, daftar PO, & daftar PM SEKALIGUS (paralel), bukan bergantian -- lebih cepat.
+  // DO Maker tidak boleh lihat Kuota/Realisasi/Selisih sama sekali, jadi tidak usah tarik data PM-nya.
+  const canSeePmSummary = state.role !== 'do_maker';
   const [itemsResult, poResult, pmResult] = await Promise.allSettled([
     api('getItems', {}),
     api('getPO', {}),
-    api('getPM', {})
+    canSeePmSummary ? api('getPM', {}) : Promise.resolve([])
   ]);
   itemMasterCache = itemsResult.status === 'fulfilled' ? itemsResult.value : [];
   if(canCreate && !document.getElementById('poFormRows').children.length) addPoRow();
@@ -1222,10 +1224,13 @@ async function loadPO(){
   if(poResult.status !== 'fulfilled'){ toast(poResult.reason?.message || 'Gagal memuat PO', true); return; }
   poListCache = poResult.value; // tidak difilter kategori -- filternya dilakukan di render supaya tombol Bahan Baku/Operasional instan tanpa reload
 
-  if(pmResult.status === 'fulfilled'){
+  if(canSeePmSummary && pmResult.status === 'fulfilled'){
     pmListCache = pmResult.value;
     if(canCreate) loadPmDropdownForPO(pmListCache); // dropdown "Periode" di form Buat PO (khusus yang bisa buat PO)
-    populateSummaryPmSelect(pmListCache); // dropdown "ID PM" ringkasan -- untuk SEMUA role yang bisa lihat PO
+    populateSummaryPmSelect(pmListCache); // dropdown "ID PM" ringkasan -- untuk role yang boleh lihat (bukan DO Maker)
+  } else {
+    pmListCache = [];
+    document.getElementById('poActivePmSummary').style.display = 'none';
   }
   renderPoKategoriView();
 }
