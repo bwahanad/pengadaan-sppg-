@@ -356,6 +356,7 @@
             <button class="btn btn-ghost btn-sm" id="openInvoiceBtn" style="display:none;">📄 Invoice PDF</button>
             <button class="btn btn-ghost btn-sm" id="openPrintDoBtn" style="display:none;">🖨 Print DO</button>
             <button class="btn btn-accent btn-sm" id="openWaSendBtn" style="display:none;">Kirim PO ke WA Suplier</button>
+            <button class="btn btn-accent btn-sm" id="openWaSendDoBtn" style="display:none;">Kirim PO ke WA DO Maker</button>
             <button class="refresh-btn" onclick="refreshView(this, loadPO)" title="Refresh">↻</button>
           </div>
         </div>
@@ -607,6 +608,30 @@
     <div class="confirm-actions" style="margin-top:16px;">
       <button class="btn btn-ghost btn-sm" id="waSendCancelBtn">Batal</button>
       <button class="btn btn-accent btn-sm" id="waSendConfirmBtn" disabled>Kirim WA</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="waSendDoOverlay">
+  <div class="confirm-box" style="max-width:400px; text-align:left;">
+    <h3 style="margin:0 0 12px; font-size:18px;">Kirim PO ke WA DO Maker</h3>
+    <div class="field" style="margin-bottom:10px;">
+      <label>Tanggal PO</label>
+      <input type="date" id="waSendDoTanggal">
+    </div>
+    <div class="field" id="waSendDoMakerField" style="margin-bottom:6px; display:none;">
+      <label>Kirim ke</label>
+      <select id="waSendDoMakerSelect"></select>
+    </div>
+    <p id="waSendDoInfo" class="helptext" style="margin:6px 0 0;"></p>
+    <div class="wa-item-row" id="waSelectAllDoRow" style="border-bottom:2px solid var(--line); display:none;">
+      <div class="wa-check" id="waSelectAllDoCheck"></div>
+      <div class="wa-item-info"><div class="nm">Pilih Semua</div></div>
+    </div>
+    <div id="waSendDoItemList" style="max-height:260px; overflow-y:auto; margin-top:2px;"></div>
+    <div class="confirm-actions" style="margin-top:16px;">
+      <button class="btn btn-ghost btn-sm" id="waSendDoCancelBtn">Batal</button>
+      <button class="btn btn-accent btn-sm" id="waSendDoConfirmBtn" disabled>Kirim WA</button>
     </div>
   </div>
 </div>
@@ -1181,6 +1206,7 @@ async function loadPO(){
   const canInvoice = ['admin','suplier'].includes(state.role);
   document.getElementById('poFormCard').style.display = canCreate ? 'block' : 'none';
   document.getElementById('openWaSendBtn').style.display = canCreate ? 'inline-flex' : 'none';
+  document.getElementById('openWaSendDoBtn').style.display = (state.role === 'suplier') ? 'inline-flex' : 'none';
   document.getElementById('openPrintDoBtn').style.display = canPrintDo ? 'inline-flex' : 'none';
   document.getElementById('openInvoiceBtn').style.display = canInvoice ? 'inline-flex' : 'none';
 
@@ -1823,6 +1849,143 @@ document.getElementById('waSendConfirmBtn').addEventListener('click', async () =
   }
 });
 
+/* ---------------- KIRIM PO KE WA DO MAKER (khusus Suplier) ---------------- */
+let waDoMakersCache = [];
+let waSelectedDoIds = new Set();
+
+document.getElementById('openWaSendDoBtn').addEventListener('click', async () => {
+  const overlay = document.getElementById('waSendDoOverlay');
+  const tanggalInput = document.getElementById('waSendDoTanggal');
+  const doField = document.getElementById('waSendDoMakerField');
+  const doSelect = document.getElementById('waSendDoMakerSelect');
+  const info = document.getElementById('waSendDoInfo');
+  tanggalInput.value = lastPoTanggal || '';
+  waSelectedDoIds = new Set();
+  info.textContent = 'Memuat kontak DO Maker...';
+  document.getElementById('waSendDoItemList').innerHTML = '';
+  overlay.classList.add('show');
+
+  try{ waDoMakersCache = await api('getDoMakerContacts', {}); }
+  catch(e){ waDoMakersCache = []; }
+
+  const withWa = waDoMakersCache.filter(s => normalizeWaNumber(s.NoWA));
+  if(!withWa.length){
+    info.textContent = 'Belum ada nomor WhatsApp DO Maker yang terdaftar untuk SPPG ini. Tambahkan lewat Kelola User.';
+    doField.style.display = 'none';
+  } else if(withWa.length === 1){
+    doField.style.display = 'none';
+    info.textContent = `Akan dikirim ke: ${withWa[0].Nama} (${withWa[0].NoWA})`;
+  } else {
+    doField.style.display = 'block';
+    doSelect.innerHTML = withWa.map((s,i) => `<option value="${i}">${s.Nama} (${s.NoWA})</option>`).join('');
+    info.textContent = '';
+  }
+
+  renderWaDoItemList();
+});
+
+document.getElementById('waSendDoTanggal').addEventListener('change', renderWaDoItemList);
+
+function renderWaDoItemList(){
+  const tanggal = document.getElementById('waSendDoTanggal').value;
+  const wrap = document.getElementById('waSendDoItemList');
+  const selectAllRow = document.getElementById('waSelectAllDoRow');
+  const selectAllCheck = document.getElementById('waSelectAllDoCheck');
+  waSelectedDoIds = new Set();
+  updateWaSendDoButtonState();
+  if(!tanggal){ wrap.innerHTML = ''; selectAllRow.style.display = 'none'; return; }
+
+  const rowsForDate = poListCache.filter(po => isoDate(po['Tanggal']) === tanggal);
+  if(!rowsForDate.length){
+    wrap.innerHTML = '<p class="helptext">Tidak ada PO untuk tanggal ini.</p>';
+    selectAllRow.style.display = 'none';
+    return;
+  }
+  selectAllRow.style.display = 'flex';
+  selectAllCheck.classList.remove('selected','sent');
+
+  wrap.innerHTML = rowsForDate.map(po => {
+    const wasSent = String(po['WA_Terkirim_DO']).toUpperCase() === 'YA';
+    return `<div class="wa-item-row ${wasSent?'was-sent':''}" data-id="${po['ID']}">
+      <div class="wa-check ${wasSent?'sent':''}" data-was-sent="${wasSent}"></div>
+      <div class="wa-item-info">
+        <div class="nm">${po['Item']}</div>
+        <div class="meta">${po['Qty']} ${po['Unit']}${wasSent ? ' · sudah pernah dikirim' : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  function toggleRow(row, checkEl){
+    const id = row.dataset.id;
+    const wasSent = checkEl.dataset.wasSent === 'true';
+    if(waSelectedDoIds.has(id)){
+      waSelectedDoIds.delete(id);
+      checkEl.classList.remove('selected');
+      checkEl.classList.toggle('sent', wasSent);
+    } else {
+      waSelectedDoIds.add(id);
+      checkEl.classList.remove('sent');
+      checkEl.classList.add('selected');
+    }
+  }
+
+  wrap.querySelectorAll('.wa-item-row').forEach(row => {
+    const checkEl = row.querySelector('.wa-check');
+    checkEl.addEventListener('click', () => {
+      toggleRow(row, checkEl);
+      selectAllCheck.classList.toggle('selected', waSelectedDoIds.size === rowsForDate.length);
+      updateWaSendDoButtonState();
+    });
+  });
+
+  selectAllCheck.addEventListener('click', () => {
+    const allSelected = waSelectedDoIds.size === rowsForDate.length;
+    wrap.querySelectorAll('.wa-item-row').forEach(row => {
+      const checkEl = row.querySelector('.wa-check');
+      const isSelected = checkEl.classList.contains('selected');
+      if(allSelected && isSelected) toggleRow(row, checkEl);
+      else if(!allSelected && !isSelected) toggleRow(row, checkEl);
+    });
+    selectAllCheck.classList.toggle('selected', !allSelected);
+    updateWaSendDoButtonState();
+  });
+}
+
+function updateWaSendDoButtonState(){
+  document.getElementById('waSendDoConfirmBtn').disabled = waSelectedDoIds.size === 0;
+}
+
+document.getElementById('waSendDoCancelBtn').addEventListener('click', () => {
+  document.getElementById('waSendDoOverlay').classList.remove('show');
+});
+
+document.getElementById('waSendDoConfirmBtn').addEventListener('click', async () => {
+  if(!waSelectedDoIds.size){ toast('Centang minimal satu item', true); return; }
+
+  const withWa = waDoMakersCache.filter(s => normalizeWaNumber(s.NoWA));
+  if(!withWa.length){ toast('Tidak ada nomor WA DO Maker terdaftar', true); return; }
+  const doField = document.getElementById('waSendDoMakerField');
+  const chosen = doField.style.display === 'block'
+    ? withWa[Number(document.getElementById('waSendDoMakerSelect').value)]
+    : withWa[0];
+
+  const btn = document.getElementById('waSendDoConfirmBtn');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'Mengirim...';
+  try{
+    const result = await api('sendPOWhatsAppToDoMaker', { poIds: Array.from(waSelectedDoIds), doMakerEmail: chosen.Email });
+    toast(`PO terkirim ke ${result.target} (${result.count} item)`);
+    document.getElementById('waSendDoOverlay').classList.remove('show');
+    loadPO();
+  } catch(e){
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+});
+
 function isoDate(d){
   const dt = new Date(d);
   if(isNaN(dt)) return '';
@@ -2058,17 +2221,23 @@ let myProfileCache = null;
 document.getElementById('openInvoiceBtn').addEventListener('click', async () => {
   const overlay = document.getElementById('invoiceOverlay');
   const info = document.getElementById('invoiceInfo');
-  document.getElementById('invoiceTanggal').value = lastPoTanggal || '';
-  document.getElementById('invoiceNomorSurat').value = '';
+  document.getElementById('invoiceTanggal').value = ''; // Tanggal SELALU dikosongkan, tidak diingat dari entry sebelumnya
   info.textContent = 'Memuat profil...';
   overlay.classList.add('show');
 
+  // Nomor Surat & Nama Kota diingat dari entry terakhir (bisa diubah manual, mis. nomor surat dinaikkan)
+  let nomorSurat = '', kota = '';
+  try{ nomorSurat = localStorage.getItem('invoiceNomorSurat_' + state.sppgId) || ''; }catch(e){}
+  try{ kota = localStorage.getItem('invoiceKota_' + state.sppgId) || ''; }catch(e){}
+  document.getElementById('invoiceNomorSurat').value = nomorSurat;
+  document.getElementById('invoiceKota').value = kota;
+
   try{
     myProfileCache = await api('getMyProfile', {});
-    document.getElementById('invoicePosisi').value = myProfileCache.Posisi || '';
-    let kota = '';
-    try{ kota = localStorage.getItem('invoiceKota_' + state.sppgId) || ''; }catch(e){}
-    document.getElementById('invoiceKota').value = kota;
+    // Posisi: pakai yang diingat dari entry terakhir kalau ada, kalau belum pernah diisi manual pakai default dari profil
+    let posisi = '';
+    try{ posisi = localStorage.getItem('invoicePosisi_' + state.sppgId) || ''; }catch(e){}
+    document.getElementById('invoicePosisi').value = posisi || myProfileCache.Posisi || '';
     if(!myProfileCache.NamaPemilikUD){
       info.textContent = 'Nama Pemilik UD belum diisi. Lengkapi dulu lewat Kelola User supaya tanda tangan invoice terisi.';
     } else {
@@ -2133,7 +2302,11 @@ document.getElementById('invoiceConfirmBtn').addEventListener('click', async () 
   if(!rowsForDate.length){ toast('Tidak ada PO bahan baku untuk tanggal ini', true); return; }
   if(!window.jspdf){ toast('Library PDF belum termuat, coba lagi sebentar', true); return; }
 
-  try{ localStorage.setItem('invoiceKota_' + state.sppgId, kota); }catch(e){}
+  try{
+    localStorage.setItem('invoiceKota_' + state.sppgId, kota);
+    localStorage.setItem('invoiceNomorSurat_' + state.sppgId, nomorSurat);
+    localStorage.setItem('invoicePosisi_' + state.sppgId, posisi);
+  }catch(e){}
 
   const profile = myProfileCache || {};
   const invoiceData = {
@@ -2198,7 +2371,7 @@ function buildInvoiceDoc(d){
   doc.text('Nomor Surat : ' + d.nomorSurat, satuanLeftX, y);
   doc.text('Hal : Tagihan Bahan Baku ' + d.tanggalLabel, satuanLeftX, y+6);
 
-  y += 26;
+  y += 34; // jarak antara blok "Kepada Yth" dan tabel item -- dilebarkan supaya tidak terlalu rapat
 
   // Tabel item
   let no = 0;
@@ -2214,8 +2387,9 @@ function buildInvoiceDoc(d){
     head: [['No.','Item','Qty','Satuan','Harga Satuan','Jumlah']],
     body: body,
     foot: [['', '', '', '', 'TOTAL', 'Rp' + total.toLocaleString('id-ID')]],
+    showFoot: 'lastPage', // TOTAL cuma muncul 1x di halaman terakhir, tidak diulang tiap halaman
     theme: 'grid',
-    styles: { fontSize: 10, cellPadding: 2 },
+    styles: { fontSize: 10, cellPadding: { top: 1, right: 2, bottom: 1, left: 2 } }, // baris dirapatkan (hemat kertas) tapi tetap kebaca
     headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', lineWidth: 0.2, lineColor: [0,0,0] },
     footStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', halign: 'right', lineWidth: 0.2, lineColor: [0,0,0] },
     columnStyles: {
