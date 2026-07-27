@@ -1272,7 +1272,20 @@ function renderPoKategoriView(){
   document.getElementById('poKatBahanBakuBtn').className = 'btn btn-sm po-kategori-btn ' + (poKategoriFilter === 'bahan baku' ? 'btn-accent' : 'btn-ghost');
   document.getElementById('poKatOperasionalBtn').className = 'btn btn-sm po-kategori-btn ' + (poKategoriFilter === 'operasional' ? 'btn-accent' : 'btn-ghost');
 
-  const filtered = poListCache.filter(po => String(po['Kategori']||'').trim().toLowerCase() === poKategoriFilter);
+  let filtered = poListCache.filter(po => String(po['Kategori']||'').trim().toLowerCase() === poKategoriFilter);
+
+  // Daftar PO juga ikut mengikuti PM yang dipilih di dropdown "ID PM" -- PO dari minggu lain tidak
+  // ikut tampil lagi kecuali PM minggu itu yang dipanggil/dipilih. Rentang sama seperti Realisasi
+  // (mulai H-1/Minggu sebelum PM, sampai hari Sabtu terakhir PM).
+  const activePm = getSelectedPmForSummary();
+  if(activePm){
+    const mulaiMinusOne = new Date(activePm['Mulai']);
+    mulaiMinusOne.setDate(mulaiMinusOne.getDate() - 1);
+    const mulaiStr = isoDate(mulaiMinusOne);
+    const sampaiStr = isoDate(activePm['Sampai']);
+    filtered = filtered.filter(po => isoDate(po['Tanggal']) >= mulaiStr && isoDate(po['Tanggal']) <= sampaiStr);
+  }
+
   renderPOTable(filtered);
   renderActivePmSummary(filtered);
 }
