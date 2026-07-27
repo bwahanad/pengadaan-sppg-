@@ -1317,8 +1317,11 @@ function renderActivePmSummary(filteredList){
     kuotaCard.style.display = 'none';
     selisihCard.style.display = 'none';
     realisasiCard.querySelector('.label').textContent = 'Total Belanja Operasional';
+    // Realisasi dihitung mulai H-1 (hari Minggu sebelum minggu berjalan), sama seperti backend.
+    const mulaiMinusOne = new Date(active['Mulai']);
+    mulaiMinusOne.setDate(mulaiMinusOne.getDate() - 1);
     const totalOperasional = filteredList
-      .filter(po => isoDate(po['Tanggal']) >= isoDate(active['Mulai']) && isoDate(po['Tanggal']) <= isoDate(active['Sampai']))
+      .filter(po => isoDate(po['Tanggal']) >= isoDate(mulaiMinusOne) && isoDate(po['Tanggal']) <= isoDate(active['Sampai']))
       .reduce((s, po) => s + (Number(po['Total Belanja']) || 0), 0);
     document.getElementById('poPmRealisasi').textContent = fmtRupiah(totalOperasional);
   }
@@ -2399,20 +2402,22 @@ function buildInvoiceDoc(d){
 
   y += 16; // hampir tanpa jarak antara blok "Kepada Yth" dan tabel item (sesuai permintaan)
 
-  // Tabel item
+  // Tabel item -- kolom Harga Satuan & Jumlah cuma berisi ANGKA (tanpa "Rp") supaya rata kanan-nya pas;
+  // "Rp" digambar manual rata kiri lewat didDrawCell di bawah, jadi dalam 1 sel: "Rp" kiri, angka kanan.
   let no = 0;
   const total = d.items.reduce((s,it) => s + it.qty*it.hargaSatuan, 0);
+  const RP_COLS = [4, 5]; // index kolom Harga Satuan & Jumlah
   const body = d.items.map(it => {
     no++;
     const jumlah = it.qty * it.hargaSatuan;
-    return [String(no), it.nama, String(it.qty), it.satuan, 'Rp' + it.hargaSatuan.toLocaleString('id-ID'), 'Rp' + jumlah.toLocaleString('id-ID')];
+    return [String(no), it.nama, String(it.qty), it.satuan, it.hargaSatuan.toLocaleString('id-ID'), jumlah.toLocaleString('id-ID')];
   });
 
   doc.autoTable({
     startY: y,
     head: [['No.','Item','Qty','Satuan','Harga Satuan','Jumlah']],
     body: body,
-    foot: [['', '', '', '', 'TOTAL', 'Rp' + total.toLocaleString('id-ID')]],
+    foot: [['', '', '', '', 'TOTAL', total.toLocaleString('id-ID')]],
     showFoot: 'lastPage', // TOTAL cuma muncul 1x di halaman terakhir, tidak diulang tiap halaman
     theme: 'grid',
     styles: { fontSize: 10, cellPadding: { top: 1, right: 2, bottom: 1, left: 2 } }, // baris dirapatkan (hemat kertas) tapi tetap kebaca
@@ -2426,7 +2431,17 @@ function buildInvoiceDoc(d){
       4: { cellWidth: COL_HARGA, halign:'right' },
       5: { cellWidth: COL_JUMLAH, halign:'right' }
     },
-    margin: { left: marginL, right: marginR, bottom: 10 } // margin bawah kertas 1cm
+    margin: { left: marginL, right: marginR, bottom: 10 }, // margin bawah kertas 1cm
+    didDrawCell: function(data){
+      // "TOTAL" di kolom 4 baris foot tetap teks biasa (rata kanan bawaan), bukan angka Rp -- dilewati.
+      if(RP_COLS.indexOf(data.column.index) === -1) return;
+      if(data.section !== 'body' && data.section !== 'foot') return;
+      if(data.section === 'foot' && data.column.index === 4) return; // sel "TOTAL" (label), bukan angka
+      doc.setFont('helvetica', data.section === 'foot' ? 'bold' : 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(0,0,0);
+      doc.text('Rp', data.cell.x + 2, data.cell.y + data.cell.height/2, { baseline:'middle' });
+    }
   });
 
   let closingY = doc.lastAutoTable.finalY + 16;
