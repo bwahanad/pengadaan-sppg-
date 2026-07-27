@@ -1226,7 +1226,6 @@ async function loadPO(){
     canSeePmSummary ? api('getPM', {}) : Promise.resolve([])
   ]);
   itemMasterCache = itemsResult.status === 'fulfilled' ? itemsResult.value : [];
-  if(canCreate && !document.getElementById('poFormRows').children.length) addPoRow();
 
   if(poResult.status !== 'fulfilled'){ toast(poResult.reason?.message || 'Gagal memuat PO', true); return; }
   poListCache = poResult.value; // tidak difilter kategori -- filternya dilakukan di render supaya tombol Bahan Baku/Operasional instan tanpa reload
@@ -1239,6 +1238,12 @@ async function loadPO(){
     pmListCache = [];
     document.getElementById('poActivePmSummary').style.display = 'none';
   }
+
+  // Baris form Buat PO dibuat SETELAH pmListCache & dropdown Periode siap, supaya kunci tanggal
+  // (min/max sesuai Periode) langsung aktif dari baris pertama, bukan cuma setelah ganti Periode manual.
+  if(canCreate && !document.getElementById('poFormRows').children.length) addPoRow();
+  else applyPoTanggalRangeToAllRows(); // kalau baris sudah ada (refresh data), sinkronkan ulang kuncinya
+
   renderPoKategoriView();
 }
 
@@ -1518,6 +1523,8 @@ function addPoRow(){
   const itemSel = div.querySelector('.po-item');
   const unitInput = div.querySelector('.po-unit');
 
+  applyPoTanggalRange(tanggalInput); // kunci min/max sesuai Periode yang sedang dipilih
+
   tanggalInput.addEventListener('change', () => { lastPoTanggal = tanggalInput.value; });
 
   groupSel.addEventListener('change', () => {
@@ -1541,6 +1548,27 @@ function addPoRow(){
   });
 }
 document.getElementById('addPoRowBtn').addEventListener('click', addPoRow);
+
+/** Kunci min/max 1 kotak tanggal PO sesuai rentang Mulai-Sampai dari Periode (PM) yang sedang dipilih. */
+function applyPoTanggalRange(tanggalInput){
+  const pmId = document.getElementById('poFormPm').value;
+  const pm = pmListCache.find(p => p['ID PM'] === pmId);
+  if(!pm){ tanggalInput.removeAttribute('min'); tanggalInput.removeAttribute('max'); return; }
+  const minStr = isoDate(pm['Mulai']);
+  const maxStr = isoDate(pm['Sampai']);
+  tanggalInput.min = minStr;
+  tanggalInput.max = maxStr;
+  // Kalau tanggal yang sudah keisi ternyata di luar rentang periode baru, kosongkan supaya tidak salah kirim.
+  if(tanggalInput.value && (tanggalInput.value < minStr || tanggalInput.value > maxStr)){
+    tanggalInput.value = '';
+  }
+}
+
+/** Terapkan ulang kunci tanggal ke SEMUA baris form yang sedang ada, dipanggil saat Periode diganti. */
+function applyPoTanggalRangeToAllRows(){
+  document.querySelectorAll('#poFormRows .po-tanggal').forEach(applyPoTanggalRange);
+}
+document.getElementById('poFormPm').addEventListener('change', applyPoTanggalRangeToAllRows);
 
 /* ---------------- ITEM MASTER ---------------- */
 const GROUP_SORT_ORDER = ['Karbo','Protein Hewani','Protein Nabati','Sayur','Buah','Bumbu','Susu'];
