@@ -2451,7 +2451,7 @@ function buildInvoiceDoc(d){
   const body = d.items.map(it => {
     no++;
     const jumlah = it.qty * it.hargaSatuan;
-    return [String(no), it.nama, String(it.qty), it.satuan, it.hargaSatuan.toLocaleString('id-ID'), jumlah.toLocaleString('id-ID')];
+    return [String(no), it.nama, it.qty.toLocaleString('id-ID'), it.satuan, it.hargaSatuan.toLocaleString('id-ID'), jumlah.toLocaleString('id-ID')];
   });
 
   doc.autoTable({
@@ -2461,9 +2461,10 @@ function buildInvoiceDoc(d){
     foot: [['', '', '', '', 'TOTAL', total.toLocaleString('id-ID')]],
     showFoot: 'lastPage', // TOTAL cuma muncul 1x di halaman terakhir, tidak diulang tiap halaman
     theme: 'grid',
-    styles: { fontSize: 10, cellPadding: { top: 1, right: 2, bottom: 1, left: 2 } }, // baris dirapatkan (hemat kertas) tapi tetap kebaca
-    headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', lineWidth: 0.2, lineColor: [0,0,0] },
-    footStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', halign: 'right', lineWidth: 0.2, lineColor: [0,0,0] },
+    styles: { fontSize: 9.5, cellPadding: { top: 0.8, right: 2, bottom: 0.8, left: 2 }, lineWidth: 0.1, lineColor: [0,0,0] }, // baris dirapatkan (hemat kertas), border seragam tipis di semua sel
+    headStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', lineWidth: 0.1, lineColor: [0,0,0] },
+    footStyles: { fillColor: [255,255,255], textColor: [0,0,0], fontStyle: 'bold', halign: 'right', lineWidth: 0.1, lineColor: [0,0,0] },
+    bodyStyles: { lineWidth: 0.1, lineColor: [0,0,0] },
     columnStyles: {
       0: { cellWidth: COL_NO, halign:'center' },
       1: { cellWidth: 'auto' },
