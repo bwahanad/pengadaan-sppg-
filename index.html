@@ -2430,16 +2430,16 @@ function buildInvoiceDoc(d){
   y += 12;
 
   doc.setFont('helvetica','normal');
-  doc.setFontSize(11);
+  doc.setFontSize(9.5);
 
   // Header kiri: Kepada Yth
   doc.text('Kepada Yth,', marginL, y);
-  doc.text('Kepala SPPG', marginL, y+6);
-  doc.text(d.namaDapur, marginL, y+12);
+  doc.text('Kepala SPPG', marginL, y+5);
+  doc.text(d.namaDapur, marginL, y+10);
 
   // Header kanan: nomor surat & hal -- posisi sejajar border kiri kolom Satuan, teks rata KIRI
   doc.text('Nomor Surat : ' + d.nomorSurat, satuanLeftX, y);
-  doc.text('Hal : Tagihan Bahan Baku ' + d.tanggalLabel, satuanLeftX, y+6);
+  doc.text('Hal : Tagihan Bahan Baku ' + d.tanggalLabel, satuanLeftX, y+5);
 
   y += 16; // hampir tanpa jarak antara blok "Kepada Yth" dan tabel item (sesuai permintaan)
 
@@ -2480,7 +2480,7 @@ function buildInvoiceDoc(d){
       if(data.section !== 'body' && data.section !== 'foot') return;
       if(data.section === 'foot' && data.column.index === 4) return; // sel "TOTAL" (label), bukan angka
       doc.setFont('helvetica', data.section === 'foot' ? 'bold' : 'normal');
-      doc.setFontSize(10);
+      doc.setFontSize(9.5);
       doc.setTextColor(0,0,0);
       doc.text('Rp', data.cell.x + 2, data.cell.y + data.cell.height/2, { baseline:'middle' });
     }
@@ -2493,17 +2493,17 @@ function buildInvoiceDoc(d){
   // Penutup -- blok diposisikan di sisi kanan halaman, tapi teksnya rata KIRI (bukan rata kanan per baris)
   const closingX = pageWidth - marginR - 70; // lebar blok ~70mm, cukup untuk baris terpanjang
   doc.text(d.kota + ', ' + d.tanggalLabel, closingX, closingY);
-  doc.text('Hormat kami,', closingX, closingY+6);
-  doc.text(d.namaUD, closingX, closingY+12);
+  doc.text('Hormat kami,', closingX, closingY+5);
+  doc.text(d.namaUD, closingX, closingY+10);
 
   // Row1: kota,tanggal | Row2: Hormat kami | Row3: Nama UD | Row4-5: kosong | Row6: nama suplier | Row7: jabatan
-  const signY = closingY + (5*6); // baris ke-6
+  const signY = closingY + (5*5); // baris ke-6 (spasi antar baris 5mm, mengikuti font 9.5pt)
   const namaSigner = d.namaPemilikUD || '________________';
   doc.text(namaSigner, closingX, signY);
   const signerWidth = doc.getTextWidth(namaSigner);
   doc.setLineWidth(0.2); // pastikan cuma 1 garis tipis yang bersih, bukan tampak dobel
   doc.line(closingX, signY+1.5, closingX+signerWidth, signY+1.5);
-  doc.text(d.posisi || '', closingX, signY+6);
+  doc.text(d.posisi || '', closingX, signY+5);
 
   return doc;
 }
