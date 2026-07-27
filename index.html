@@ -666,11 +666,18 @@
   <div class="confirm-box" style="max-width:400px; text-align:left;">
     <h3 style="margin:0 0 12px; font-size:18px;">Buat Invoice PDF</h3>
     <div class="row" style="margin-bottom:8px;">
-      <div class="field"><label>Tanggal Periode</label><input type="date" id="invoiceTanggal"></div>
-      <div class="field"><label>Nomor Surat</label><input type="text" id="invoiceNomorSurat" placeholder="mis. 001/UD-BJ/VII/2026"></div>
+      <div class="field"><label>Tanggal PO</label><input type="date" id="invoiceTanggal"></div>
+      <div class="field"><label>Tanggal Invoice</label><input type="date" id="invoiceTanggalInvoice"></div>
     </div>
     <div class="row" style="margin-bottom:8px;">
+      <div class="field"><label>Nomor Surat</label><input type="text" id="invoiceNomorSurat" placeholder="mis. 001/UD-BJ/VII/2026"></div>
       <div class="field"><label>Nama Kota</label><input type="text" id="invoiceKota" placeholder="mis. Batam"></div>
+    </div>
+    <div class="row" style="margin-bottom:8px;">
+      <div class="field"><label>Nama Perusahaan</label><input type="text" id="invoiceNamaUD" placeholder="mis. UD Barokah Jaya"></div>
+      <div class="field"><label>Nama Penanda Tangan</label><input type="text" id="invoiceNamaPenandaTangan" placeholder="mis. Aang"></div>
+    </div>
+    <div class="row" style="margin-bottom:8px;">
       <div class="field"><label>Posisi Penandatangan</label><input type="text" id="invoicePosisi" placeholder="mis. Direktur"></div>
     </div>
     <p id="invoiceInfo" class="helptext" style="margin:6px 0 0;"></p>
@@ -2226,16 +2233,20 @@ let myProfileCache = null;
 document.getElementById('openInvoiceBtn').addEventListener('click', async () => {
   const overlay = document.getElementById('invoiceOverlay');
   const info = document.getElementById('invoiceInfo');
-  document.getElementById('invoiceTanggal').value = ''; // Tanggal SELALU dikosongkan, tidak diingat dari entry sebelumnya
+  document.getElementById('invoiceTanggal').value = ''; // Tanggal PO SELALU dikosongkan, tidak diingat dari entry sebelumnya
   info.textContent = 'Memuat profil...';
   overlay.classList.add('show');
 
-  // Nomor Surat & Nama Kota diingat dari entry terakhir (bisa diubah manual, mis. nomor surat dinaikkan)
-  let nomorSurat = '', kota = '';
+  // Tanggal Invoice, Nomor Surat, Nama Kota, Nama Perusahaan & Nama Penanda Tangan diingat dari entry terakhir
+  let nomorSurat = '', kota = '', tanggalInvoice = '', namaUD = '', namaPenandaTangan = '';
   try{ nomorSurat = localStorage.getItem('invoiceNomorSurat_' + state.sppgId) || ''; }catch(e){}
   try{ kota = localStorage.getItem('invoiceKota_' + state.sppgId) || ''; }catch(e){}
+  try{ tanggalInvoice = localStorage.getItem('invoiceTanggalInvoice_' + state.sppgId) || ''; }catch(e){}
+  try{ namaUD = localStorage.getItem('invoiceNamaUD_' + state.sppgId) || ''; }catch(e){}
+  try{ namaPenandaTangan = localStorage.getItem('invoiceNamaPenandaTangan_' + state.sppgId) || ''; }catch(e){}
   document.getElementById('invoiceNomorSurat').value = nomorSurat;
   document.getElementById('invoiceKota').value = kota;
+  document.getElementById('invoiceTanggalInvoice').value = tanggalInvoice;
 
   try{
     myProfileCache = await api('getMyProfile', {});
@@ -2243,12 +2254,13 @@ document.getElementById('openInvoiceBtn').addEventListener('click', async () => 
     let posisi = '';
     try{ posisi = localStorage.getItem('invoicePosisi_' + state.sppgId) || ''; }catch(e){}
     document.getElementById('invoicePosisi').value = posisi || myProfileCache.Posisi || '';
-    if(!myProfileCache.NamaPemilikUD){
-      info.textContent = 'Nama Pemilik UD belum diisi. Lengkapi dulu lewat Kelola User supaya tanda tangan invoice terisi.';
-    } else {
-      info.textContent = '';
-    }
+    // Nama Perusahaan & Nama Penanda Tangan: pakai yang diingat, kalau belum pernah diisi manual pakai default dari profil
+    document.getElementById('invoiceNamaUD').value = namaUD || myProfileCache.Nama || '';
+    document.getElementById('invoiceNamaPenandaTangan').value = namaPenandaTangan || myProfileCache.NamaPemilikUD || '';
+    info.textContent = '';
   } catch(e){
+    document.getElementById('invoiceNamaUD').value = namaUD;
+    document.getElementById('invoiceNamaPenandaTangan').value = namaPenandaTangan;
     info.textContent = '';
     toast(e.message, true);
   }
@@ -2291,36 +2303,45 @@ async function renderInvoicePreview(doc){
 }
 
 document.getElementById('invoiceConfirmBtn').addEventListener('click', async () => {
-  const tanggal = document.getElementById('invoiceTanggal').value;
+  const tanggal = document.getElementById('invoiceTanggal').value; // Tanggal PO -- untuk filter data saja
+  const tanggalInvoice = document.getElementById('invoiceTanggalInvoice').value; // Tanggal Invoice -- untuk teks di surat saja
   const nomorSurat = document.getElementById('invoiceNomorSurat').value.trim();
   const kota = document.getElementById('invoiceKota').value.trim();
+  const namaUD = document.getElementById('invoiceNamaUD').value.trim();
+  const namaPenandaTangan = document.getElementById('invoiceNamaPenandaTangan').value.trim();
   const posisi = document.getElementById('invoicePosisi').value.trim();
 
-  if(!tanggal){ toast('Pilih tanggal periode', true); return; }
+  if(!tanggal){ toast('Pilih Tanggal PO', true); return; }
+  if(!tanggalInvoice){ toast('Pilih Tanggal Invoice', true); return; }
   if(!nomorSurat){ toast('Isi nomor surat', true); return; }
   if(!kota){ toast('Isi nama kota', true); return; }
+  if(!namaUD){ toast('Isi Nama Perusahaan', true); return; }
+  if(!namaPenandaTangan){ toast('Isi Nama Penanda Tangan', true); return; }
 
   const rowsForDate = poListCache.filter(po =>
     isoDate(po['Tanggal']) === tanggal &&
     String(po['Kategori'] || '').trim().toLowerCase() === 'bahan baku'
   );
-  if(!rowsForDate.length){ toast('Tidak ada PO bahan baku untuk tanggal ini', true); return; }
+  if(!rowsForDate.length){ toast('Tidak ada PO bahan baku untuk Tanggal PO ini', true); return; }
   if(!window.jspdf){ toast('Library PDF belum termuat, coba lagi sebentar', true); return; }
 
   try{
     localStorage.setItem('invoiceKota_' + state.sppgId, kota);
     localStorage.setItem('invoiceNomorSurat_' + state.sppgId, nomorSurat);
     localStorage.setItem('invoicePosisi_' + state.sppgId, posisi);
+    localStorage.setItem('invoiceTanggalInvoice_' + state.sppgId, tanggalInvoice);
+    localStorage.setItem('invoiceNamaUD_' + state.sppgId, namaUD);
+    localStorage.setItem('invoiceNamaPenandaTangan_' + state.sppgId, namaPenandaTangan);
   }catch(e){}
 
   const profile = myProfileCache || {};
   const invoiceData = {
     namaDapur: state.sppgNama || '',
-    namaUD: profile.Nama || state.nama || '',
-    namaPemilikUD: profile.NamaPemilikUD || '',
+    namaUD: namaUD,
+    namaPemilikUD: namaPenandaTangan,
     posisi: posisi || profile.Posisi || '',
     nomorSurat, kota,
-    tanggalLabel: fmtDate(tanggal),
+    tanggalLabel: fmtDate(tanggalInvoice), // dipakai di "Hal: Tagihan Bahan Baku ..." dan tanggal penutup surat
     items: rowsForDate.map(po => ({
       nama: po['Item'], satuan: po['Unit'], qty: Number(po['Qty'])||0,
       hargaSatuan: Number(po['Unit Price'])||0
