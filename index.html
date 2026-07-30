@@ -364,6 +364,7 @@
           <button class="btn btn-accent btn-sm po-kategori-btn" data-kategori="bahan baku" id="poKatBahanBakuBtn">Bahan Baku</button>
           <button class="btn btn-ghost btn-sm po-kategori-btn" data-kategori="operasional" id="poKatOperasionalBtn">Operasional</button>
         </div>
+        <div class="field" style="margin-bottom:14px;"><input type="text" id="poSearchInput" placeholder="🔍 Cari item di daftar PO..."></div>
         <div id="poActivePmSummary" style="display:none; margin-bottom:14px;">
           <div class="field" style="max-width:320px; margin-bottom:10px;">
             <label>ID PM</label>
@@ -426,6 +427,7 @@
           <h2>Daftar Item</h2>
           <button class="refresh-btn" onclick="refreshView(this, loadItemMaster)" title="Refresh">↻</button>
         </div>
+        <div class="field" style="margin-bottom:10px;"><input type="text" id="itemSearchInput" placeholder="🔍 Cari item..."></div>
         <div class="table-wrap"><table class="compact-table">
           <thead><tr id="itemTableHead"></tr></thead>
           <tbody id="itemTableBody"></tbody>
@@ -1291,9 +1293,15 @@ function renderPoKategoriView(){
     filtered = filtered.filter(po => isoDate(po['Tanggal']) >= mulaiStr && isoDate(po['Tanggal']) <= sampaiStr);
   }
 
-  renderPOTable(filtered);
-  renderActivePmSummary(filtered);
+  renderActivePmSummary(filtered); // ringkasan Kuota/Realisasi TIDAK ikut kepengaruh kotak pencarian
+
+  // Kotak pencarian cuma menyaring TABEL yang ditampilkan, tidak mengubah angka ringkasan di atasnya.
+  const searchQ = document.getElementById('poSearchInput').value.trim().toLowerCase();
+  const tableList = searchQ ? filtered.filter(po => String(po['Item']||'').toLowerCase().includes(searchQ)) : filtered;
+  renderPOTable(tableList);
 }
+
+document.getElementById('poSearchInput').addEventListener('input', renderPoKategoriView);
 
 document.querySelectorAll('.po-kategori-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -1574,27 +1582,34 @@ document.getElementById('poFormPm').addEventListener('change', applyPoTanggalRan
 const GROUP_SORT_ORDER = ['Karbo','Protein Hewani','Protein Nabati','Sayur','Buah','Bumbu','Susu'];
 
 function sortItemsForDisplay(list){
-  return [...list].sort((a,b) => {
-    const ga = GROUP_SORT_ORDER.indexOf(a['Group']);
-    const gb = GROUP_SORT_ORDER.indexOf(b['Group']);
-    const gaIdx = ga === -1 ? GROUP_SORT_ORDER.length : ga;
-    const gbIdx = gb === -1 ? GROUP_SORT_ORDER.length : gb;
-    if(gaIdx !== gbIdx) return gaIdx - gbIdx;
-    return String(a['Item']||'').localeCompare(String(b['Item']||''), 'id', {sensitivity:'base'});
-  });
+  return [...list].sort((a,b) => String(a['Item']||'').localeCompare(String(b['Item']||''), 'id', {sensitivity:'base'}));
 }
+
+let itemRoleFlags = {};
 
 async function loadItemMaster(){
   const canManageDescriptive = ['admin','keuangan'].includes(state.role);
   const canEditModal = ['admin'].includes(state.role); // suplier sudah tidak akses Item Master lagi
   const canSeeModalRef = ['admin'].includes(state.role); // Modal Per Unit = referensi modal, dirahasiakan dari Keuangan
   const canDelete = ['admin','keuangan'].includes(state.role);
+  itemRoleFlags = { canManageDescriptive, canEditModal, canSeeModalRef, canDelete };
   document.getElementById('itemFormCard').style.display = canManageDescriptive ? 'block' : 'none';
 
   let list = [];
   try{ list = await api('getItems', {}); } catch(e){ toast(e.message, true); return; }
-  itemMasterCache = list;
-  list = sortItemsForDisplay(list);
+  itemMasterCache = sortItemsForDisplay(list); // urut A-Z sekali di sini, dipakai ulang saat pencarian
+
+  renderItemMasterRows(itemMasterCache);
+}
+
+document.getElementById('itemSearchInput').addEventListener('input', () => {
+  const q = document.getElementById('itemSearchInput').value.trim().toLowerCase();
+  const filtered = q ? itemMasterCache.filter(it => String(it['Item']||'').toLowerCase().includes(q)) : itemMasterCache;
+  renderItemMasterRows(filtered);
+});
+
+function renderItemMasterRows(list){
+  const { canManageDescriptive, canEditModal, canSeeModalRef, canDelete } = itemRoleFlags;
 
   const head = document.getElementById('itemTableHead');
   head.innerHTML = `<th>Item</th><th>Satuan</th><th>Group</th><th>Kategori</th>
@@ -1604,7 +1619,7 @@ async function loadItemMaster(){
 
   const tb = document.getElementById('itemTableBody'); tb.innerHTML = '';
   const colCount = 5 + (canSeeModalRef?1:0) + ((canManageDescriptive||canDelete)?1:0);
-  if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Belum ada item</td></tr>`; return; }
+  if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Tidak ada item yang cocok</td></tr>`; return; }
   list.forEach(it => {
     const tr = document.createElement('tr');
     const modalCell = `<td data-label="Unit Price" class="right">${canEditModal
@@ -1648,7 +1663,7 @@ async function loadItemMaster(){
   if(canManageDescriptive){
     tb.querySelectorAll('.edit-item-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        const it = list.find(x => x['ID'] === btn.dataset.id);
+        const it = itemMasterCache.find(x => x['ID'] === btn.dataset.id);
         if(!it) return;
         document.getElementById('itemNama').value = it['Item'] || '';
         document.getElementById('itemSatuan').value = it['satuan'] || '';
