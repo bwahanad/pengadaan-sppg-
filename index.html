@@ -374,6 +374,8 @@
             <div class="summary-item" id="poPmKuotaCard"><div class="label">Kuota</div><div class="value" id="poPmKuota">Rp0</div></div>
             <div class="summary-item" id="poPmRealisasiCard"><div class="label">Realisasi</div><div class="value" id="poPmRealisasi">Rp0</div></div>
             <div class="summary-item" id="poPmSelisihCard"><div class="label">Selisih</div><div class="value" id="poPmSelisih">Rp0</div></div>
+            <div class="summary-item" id="poPmModalCard" style="display:none;"><div class="label">Modal</div><div class="value" id="poPmModal">Rp0</div></div>
+            <div class="summary-item" id="poPmProfitCard" style="display:none;"><div class="label">Profit</div><div class="value" id="poPmProfit">Rp0</div></div>
           </div>
         </div>
         <div class="table-wrap"><table class="compact-table">
@@ -1328,6 +1330,9 @@ function renderActivePmSummary(filteredList){
   const kuotaCard = document.getElementById('poPmKuotaCard');
   const selisihCard = document.getElementById('poPmSelisihCard');
   const realisasiCard = document.getElementById('poPmRealisasiCard');
+  const modalCard = document.getElementById('poPmModalCard');
+  const profitCard = document.getElementById('poPmProfitCard');
+  const canSeeModal = active['Total Modal'] !== undefined; // backend cuma kirim field ini untuk Investor/Suplier/Admin
 
   if(poKategoriFilter === 'bahan baku'){
     kuotaCard.style.display = '';
@@ -1338,10 +1343,25 @@ function renderActivePmSummary(filteredList){
     const selisihEl = document.getElementById('poPmSelisih');
     selisihEl.textContent = fmtRupiah(active['Selisih']);
     selisihCard.className = 'summary-item ' + (Number(active['Selisih']) < 0 ? 'neg' : 'pos');
+
+    // Modal & Profit -- rentang waktu sama persis dengan Kuota/Realisasi, cuma tampil untuk role yang boleh lihat modal.
+    if(canSeeModal){
+      modalCard.style.display = '';
+      profitCard.style.display = '';
+      document.getElementById('poPmModal').textContent = fmtRupiah(active['Total Modal']);
+      const profitEl = document.getElementById('poPmProfit');
+      profitEl.textContent = fmtRupiah(active['Profit']);
+      profitCard.className = 'summary-item ' + (Number(active['Profit']) < 0 ? 'neg' : 'pos');
+    } else {
+      modalCard.style.display = 'none';
+      profitCard.style.display = 'none';
+    }
   } else {
     // Operasional: sembunyikan Kuota & Selisih, hitung Total Belanja operasional dari list yang sudah difilter
     kuotaCard.style.display = 'none';
     selisihCard.style.display = 'none';
+    modalCard.style.display = 'none';
+    profitCard.style.display = 'none';
     realisasiCard.querySelector('.label').textContent = 'Total Belanja Operasional';
     // Realisasi dihitung mulai H-1 (hari Minggu sebelum minggu berjalan), sama seperti backend.
     const mulaiMinusOne = new Date(active['Mulai']);
