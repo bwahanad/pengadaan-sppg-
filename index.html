@@ -1388,12 +1388,12 @@ function renderActivePmSummary(filteredList){
 }
 
 function renderPOTable(list){
-  const canFillPrice = ['admin','suplier'].includes(state.role);
+  const canFillPriceGeneral = ['admin','suplier'].includes(state.role); // boleh isi harga baris APA SAJA
+  const canFillPriceOpsOnly = ['keuangan','ops_maker'].includes(state.role); // boleh isi harga KHUSUS baris Operasional
   const canSeeModal = ['admin','suplier','investor'].includes(state.role);
   const canEditModal = ['admin','suplier'].includes(state.role);
   const canEditQty = ['admin','keuangan'].includes(state.role);
   const canDelete = ['admin','keuangan'].includes(state.role);
-  const canEditPO = canFillPrice; // suplier & admin -> klik baris buka popup isi harga & modal sekaligus
 
   const head = document.getElementById('poTableHead');
   head.innerHTML = `<th>Item</th><th class="right">Qty</th><th>Satuan</th>
@@ -1429,7 +1429,9 @@ function renderPOTable(list){
 
     group.rows.forEach(po => {
       const tr = document.createElement('tr');
-      if(canEditPO){ tr.className = 'po-editable-row'; tr.dataset.id = po['ID']; }
+      const isOperasional = String(po['Kategori']||'').trim().toLowerCase() === 'operasional';
+      const canFillPrice = canFillPriceGeneral || (canFillPriceOpsOnly && isOperasional); // per baris
+      if(canFillPrice){ tr.className = 'po-editable-row'; tr.dataset.id = po['ID']; }
       const statusDotClass = po['Status']==='menunggu harga' ? 'wait' : (po['Status']==='harga terisi' ? 'filled' : 'other');
       const priceCell = canFillPrice
         ? `<span class="tap-value ${po['Unit Price']?'':'tap-value-empty'}">${po['Unit Price'] ? fmtRupiah(po['Unit Price']) : 'Tap isi'}</span>`
@@ -1456,11 +1458,9 @@ function renderPOTable(list){
     });
   });
 
-  if(canEditPO){
-    tb.querySelectorAll('.po-editable-row').forEach(row => {
-      row.addEventListener('click', () => openPoPriceEditor(row.dataset.id, list));
-    });
-  }
+  tb.querySelectorAll('.po-editable-row').forEach(row => {
+    row.addEventListener('click', () => openPoPriceEditor(row.dataset.id, list));
+  });
   if(canEditQty){
     tb.querySelectorAll('.qty-input').forEach(inp => {
       inp.addEventListener('click', (e) => e.stopPropagation()); // jangan sampai memicu popup harga (khusus admin yang punya keduanya)
