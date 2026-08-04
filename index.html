@@ -407,6 +407,7 @@
               <option value="Buah">Buah</option>
               <option value="Bumbu">Bumbu</option>
               <option value="Susu">Susu</option>
+              <option value="Operasional">Operasional</option>
             </select>
           </div>
           <div class="field" id="itemKategoriField">
@@ -1541,7 +1542,7 @@ document.getElementById('poPriceEditorSaveBtn').addEventListener('click', async 
   }
 });
 
-const GROUP_OPTIONS = ['Karbo','Protein Hewani','Protein Nabati','Sayur','Buah','Bumbu','Susu'];
+const GROUP_OPTIONS = ['Karbo','Protein Hewani','Protein Nabati','Sayur','Buah','Bumbu','Susu','Operasional'];
 let lastPoTanggal = '';
 
 function addPoRow(){
@@ -1551,6 +1552,10 @@ function addPoRow(){
   const groupOptionsHtml = GROUP_OPTIONS.map(g => `<option value="${g}">${g}</option>`).join('');
   div.innerHTML = `
     <div class="field"><label>Tanggal</label><input type="date" class="po-tanggal" value="${lastPoTanggal}"></div>
+    <div class="field po-operasional-field" style="flex:0; min-width:100px;">
+      <label>Operasional</label>
+      <div style="display:flex; align-items:center; height:38px;"><input type="checkbox" class="po-operasional" style="width:20px; height:20px; cursor:pointer;"></div>
+    </div>
     <div class="field"><label>Group</label><select class="po-group"><option value="">Pilih Group</option>${groupOptionsHtml}</select></div>
     <div class="field" style="flex:2;"><label>Item</label><select class="po-item"><option value="">Pilih Group dulu</option></select></div>
     <div class="field"><label>Qty</label><input type="number" class="po-qty"></div>
@@ -1560,11 +1565,19 @@ function addPoRow(){
   wrap.appendChild(div);
 
   const tanggalInput = div.querySelector('.po-tanggal');
+  const operasionalCheckbox = div.querySelector('.po-operasional');
   const groupSel = div.querySelector('.po-group');
   const itemSel = div.querySelector('.po-item');
   const unitInput = div.querySelector('.po-unit');
 
   applyPoTanggalRange(tanggalInput); // kunci min/max sesuai Periode yang sedang dipilih
+
+  // PO Ops Maker selalu Operasional -- centang otomatis, terkunci, tidak bisa diubah ke Bahan Baku.
+  if(state.role === 'ops_maker'){
+    operasionalCheckbox.checked = true;
+    operasionalCheckbox.disabled = true;
+    div.querySelector('.po-operasional-field').style.display = 'none'; // tidak perlu ditampilkan, sudah pasti
+  }
 
   tanggalInput.addEventListener('change', () => { lastPoTanggal = tanggalInput.value; });
 
@@ -1574,6 +1587,10 @@ function addPoRow(){
     if(!group){
       itemSel.innerHTML = '<option value="">Pilih Group dulu</option>';
       return;
+    }
+    // Kalau pilih Group "Operasional", otomatis centang kolom Operasional (tetap bisa diubah manual kalau perlu).
+    if(group.trim().toLowerCase() === 'operasional' && !operasionalCheckbox.disabled){
+      operasionalCheckbox.checked = true;
     }
     const groupNorm = group.trim().toLowerCase();
     const items = itemMasterCache.filter(it => String(it['Group']||'').trim().toLowerCase() === groupNorm);
@@ -1812,7 +1829,7 @@ document.getElementById('submitPoBtn').addEventListener('click', async () => {
       Group: group,
       Qty: Number(r.querySelector('.po-qty').value) || 0,
       Unit: r.querySelector('.po-unit').value.trim(),
-      Kategori: state.role === 'ops_maker' ? 'operasional' : 'bahan baku'
+      Kategori: (state.role === 'ops_maker' || r.querySelector('.po-operasional').checked) ? 'operasional' : 'bahan baku'
     });
   });
   if(!rows.length){ toast('Pilih minimal satu item', true); return; }
