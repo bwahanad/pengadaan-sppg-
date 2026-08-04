@@ -21,9 +21,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
     --bg:#F6F7F1; --paper:#FFFFFF; --ink:#1E2A20; --ink-soft:#5C6B5E;
@@ -2386,12 +2383,43 @@ document.getElementById('printDoConfirmBtn').addEventListener('click', async () 
 /* ---------------- INVOICE PDF (SUPLIER) ---------------- */
 let myProfileCache = null;
 
+/**
+ * Muat script eksternal secara lazy (cuma sekali, dipanggil ulang aman -- langsung resolve kalau
+ * sudah pernah dimuat). Dipakai untuk jsPDF/jspdf-autotable/pdf.js supaya TIDAK membebani loading
+ * awal aplikasi untuk semua pengguna -- cuma dimuat saat fitur Invoice PDF benar-benar dibuka.
+ */
+const _loadedScripts_ = {};
+function loadScriptOnce(src){
+  if(_loadedScripts_[src]) return _loadedScripts_[src];
+  _loadedScripts_[src] = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Gagal memuat library dari ' + src));
+    document.head.appendChild(s);
+  });
+  return _loadedScripts_[src];
+}
+async function ensurePdfLibsLoaded(){
+  await Promise.all([
+    loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'),
+    loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')
+  ]);
+}
+async function ensurePdfJsLoaded(){
+  await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+  if(window.pdfjsLib && !pdfjsLib.GlobalWorkerOptions.workerSrc){
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+}
+
 document.getElementById('openInvoiceBtn').addEventListener('click', async () => {
   const overlay = document.getElementById('invoiceOverlay');
   const info = document.getElementById('invoiceInfo');
   document.getElementById('invoiceTanggal').value = ''; // Tanggal PO SELALU dikosongkan, tidak diingat dari entry sebelumnya
   info.textContent = 'Memuat profil...';
   overlay.classList.add('show');
+  ensurePdfLibsLoaded().catch(()=>{}); // mulai muat di belakang layar dari sekarang, siap dipakai saat Preview diklik
 
   // Tanggal Invoice, Nomor Surat, Nama Kota, Nama Perusahaan & Nama Penanda Tangan diingat dari entry terakhir
   let nomorSurat = '', kota = '', tanggalInvoice = '', namaUD = '', namaPenandaTangan = '';
@@ -2428,15 +2456,13 @@ document.getElementById('invoiceCancelBtn').addEventListener('click', () => {
 
 let currentInvoiceDoc = null;
 
-// Setup worker pdf.js (dimuat lazy, cukup sekali)
-if(window.pdfjsLib){
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-}
-
 async function renderInvoicePreview(doc){
   const wrap = document.getElementById('invoicePreviewCanvasWrap');
   wrap.innerHTML = '<p class="helptext">Memuat preview...</p>';
-  if(!window.pdfjsLib){ wrap.innerHTML = '<p class="helptext">Library preview belum termuat, coba lagi sebentar.</p>'; return; }
+  if(!window.pdfjsLib){
+    try{ await ensurePdfJsLoaded(); }
+    catch(e){ wrap.innerHTML = '<p class="helptext">Gagal memuat library preview, cek koneksi internet.</p>'; return; }
+  }
 
   const arrayBuffer = doc.output('arraybuffer');
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -2479,7 +2505,13 @@ document.getElementById('invoiceConfirmBtn').addEventListener('click', async () 
     String(po['Kategori'] || '').trim().toLowerCase() === 'bahan baku'
   );
   if(!rowsForDate.length){ toast('Tidak ada PO bahan baku untuk Tanggal PO ini', true); return; }
-  if(!window.jspdf){ toast('Library PDF belum termuat, coba lagi sebentar', true); return; }
+
+  const btnLoad = document.getElementById('invoiceConfirmBtn');
+  const btnLoadOriginal = btnLoad.textContent;
+  btnLoad.disabled = true; btnLoad.textContent = 'Memuat...';
+  try{ await ensurePdfLibsLoaded(); }
+  catch(e){ toast('Gagal memuat library PDF, cek koneksi internet lalu coba lagi', true); btnLoad.disabled=false; btnLoad.textContent=btnLoadOriginal; return; }
+  btnLoad.disabled = false; btnLoad.textContent = btnLoadOriginal;
 
   try{
     localStorage.setItem('invoiceKota_' + state.sppgId, kota);
