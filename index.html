@@ -1343,7 +1343,29 @@ document.querySelectorAll('.po-kategori-btn').forEach(btn => {
   });
 });
 
-document.getElementById('poSummaryPmSelect').addEventListener('change', renderPoKategoriView);
+document.getElementById('poSummaryPmSelect').addEventListener('change', async () => {
+  const activePm = getSelectedPmForSummary();
+  if(activePm){
+    const mulaiMinusOne = new Date(activePm['Mulai']);
+    mulaiMinusOne.setDate(mulaiMinusOne.getDate() - 1);
+    const neededFrom = isoDate(mulaiMinusOne);
+    // Backend cuma kirim ~800 baris PO terbaru secara default -- kalau PM yang baru dipilih ternyata
+    // periodenya LEBIH TUA dari data yang sudah ada di HP sekarang, tarik data yang KURANG itu saja
+    // dari server, lalu GABUNGKAN ke data yang sudah ada (bukan menimpa) supaya kalau nanti balik
+    // lagi ke periode yang lebih baru, datanya tidak hilang.
+    const oldestLoaded = poListCache.length
+      ? poListCache.reduce((min, po) => { const d = isoDate(po['Tanggal']); return (!min || d < min) ? d : min; }, null)
+      : null;
+    if(!oldestLoaded || neededFrom < oldestLoaded){
+      try{
+        const extra = await api('getPO', { from: neededFrom, to: oldestLoaded || isoDate(activePm['Sampai']) });
+        const existingIds = new Set(poListCache.map(po => po['ID']));
+        extra.forEach(po => { if(!existingIds.has(po['ID'])) poListCache.push(po); });
+      } catch(e){ toast(e.message, true); }
+    }
+  }
+  renderPoKategoriView();
+});
 
 /**
  * Tampilkan ringkasan dari PM yang dipilih di dropdown "ID PM", di atas Daftar PO.
