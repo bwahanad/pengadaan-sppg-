@@ -713,7 +713,7 @@
 /* =====================================================================
    KONFIGURASI — WAJIB DIISI sebelum deploy (dari SPREADSHEET HUB):
    ===================================================================== */
-const API_URL = 'https://script.google.com/macros/s/AKfycbyJSB_YBpyC8Za5psrSkuP5xJlgjb0TobMqjECqBLvhHbCqFz6PRwBRfDsmoZU2Qkmvnw/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbyfkbg_NH-mBm_HfyDbPNdPNnx8aQVnBaBS3TSFpvUCJwdsSCieptAw2DOhSUzuLZOlDg/exec';
 const GOOGLE_CLIENT_ID = '437595495608-96f8k2fmdop70jub38ga46f77rov0cjt.apps.googleusercontent.com';
 
 /* ===================================================================== */
@@ -1640,10 +1640,11 @@ let itemKategoriFilter = 'bahan baku'; // default, sama seperti tab PO
 
 async function loadItemMaster(){
   const canManageDescriptive = ['admin','keuangan','ops_maker'].includes(state.role);
-  const canEditModal = ['admin'].includes(state.role); // suplier sudah tidak akses Item Master lagi
+  const canEditUnitPriceGeneral = ['admin'].includes(state.role); // boleh isi Unit Price item APA SAJA
+  const canEditUnitPriceOpsOnly = ['keuangan','ops_maker'].includes(state.role); // boleh isi Unit Price KHUSUS item Operasional
   const canSeeModalRef = ['admin'].includes(state.role); // Modal Per Unit = referensi modal, dirahasiakan dari Keuangan
   const canDelete = ['admin','keuangan'].includes(state.role);
-  itemRoleFlags = { canManageDescriptive, canEditModal, canSeeModalRef, canDelete };
+  itemRoleFlags = { canManageDescriptive, canEditUnitPriceGeneral, canEditUnitPriceOpsOnly, canSeeModalRef, canDelete };
   document.getElementById('itemFormCard').style.display = canManageDescriptive ? 'block' : 'none';
 
   // PO Ops Maker cuma boleh lihat/kelola item Operasional -- kunci tombol kategorinya, sembunyikan pilihan Bahan Baku.
@@ -1685,7 +1686,7 @@ document.querySelectorAll('.item-kategori-btn').forEach(btn => {
 document.getElementById('itemSearchInput').addEventListener('input', applyItemFilters);
 
 function renderItemMasterRows(list){
-  const { canManageDescriptive, canEditModal, canSeeModalRef, canDelete } = itemRoleFlags;
+  const { canManageDescriptive, canEditUnitPriceGeneral, canEditUnitPriceOpsOnly, canSeeModalRef, canDelete } = itemRoleFlags;
 
   const head = document.getElementById('itemTableHead');
   head.innerHTML = `<th>Item</th><th>Satuan</th><th>Group</th><th>Kategori</th>
@@ -1698,7 +1699,9 @@ function renderItemMasterRows(list){
   if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Tidak ada item yang cocok</td></tr>`; return; }
   list.forEach(it => {
     const tr = document.createElement('tr');
-    const modalCell = `<td data-label="Unit Price" class="right">${canEditModal
+    const isOperasional = String(it['Kategori']||'').trim().toLowerCase() === 'operasional';
+    const canEditThisPrice = canEditUnitPriceGeneral || (canEditUnitPriceOpsOnly && isOperasional); // per baris
+    const modalCell = `<td data-label="Unit Price" class="right">${canEditThisPrice
       ? `<input class="price-input mono item-modal-input" type="number" value="${it['Unit Price']||''}" placeholder="isi" data-id="${it['ID']}" data-nama="${it['Item']}">`
       : `<span class="num">${it['Unit Price'] ? fmtRupiah(it['Unit Price']) : '-'}</span>`}</td>`;
     const modalRefCell = canSeeModalRef
@@ -1719,23 +1722,21 @@ function renderItemMasterRows(list){
     tb.appendChild(tr);
   });
 
-  if(canEditModal){
-    tb.querySelectorAll('.item-modal-input').forEach(inp => {
-      inp.addEventListener('change', async () => {
-        try{
-          const result = await api('saveItemModal', { data:{ ID: inp.dataset.id, Item: inp.dataset.nama, 'Unit Price': Number(inp.value) } });
-          const typed = Number(inp.value) || 0;
-          if(result.price > typed){
-            toast(`Tersimpan sebagai ${fmtRupiah(result.price)} (harga tertinggi yang pernah diinput, bukan angka barusan)`);
-          } else {
-            toast('Unit Price tersimpan');
-          }
-          loadItemMaster();
+  tb.querySelectorAll('.item-modal-input').forEach(inp => {
+    inp.addEventListener('change', async () => {
+      try{
+        const result = await api('saveItemModal', { data:{ ID: inp.dataset.id, Item: inp.dataset.nama, 'Unit Price': Number(inp.value) } });
+        const typed = Number(inp.value) || 0;
+        if(result.price > typed){
+          toast(`Tersimpan sebagai ${fmtRupiah(result.price)} (harga tertinggi yang pernah diinput, bukan angka barusan)`);
+        } else {
+          toast('Unit Price tersimpan');
         }
-        catch(e){ toast(e.message, true); }
-      });
+        loadItemMaster();
+      }
+      catch(e){ toast(e.message, true); }
     });
-  }
+  });
   if(canManageDescriptive){
     tb.querySelectorAll('.edit-item-btn').forEach(btn => {
       btn.addEventListener('click', () => {
