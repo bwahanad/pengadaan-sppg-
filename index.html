@@ -409,7 +409,7 @@
               <option value="Susu">Susu</option>
             </select>
           </div>
-          <div class="field">
+          <div class="field" id="itemKategoriField">
             <label>Kategori</label>
             <select id="itemKategori">
               <option value="bahan baku">Bahan Baku</option>
@@ -428,6 +428,10 @@
         <div class="card-head">
           <h2>Daftar Item</h2>
           <button class="refresh-btn" onclick="refreshView(this, loadItemMaster)" title="Refresh">↻</button>
+        </div>
+        <div class="row" style="gap:8px; margin-bottom:10px;">
+          <button class="btn btn-accent btn-sm item-kategori-btn" data-kategori="bahan baku" id="itemKatBahanBakuBtn">Bahan Baku</button>
+          <button class="btn btn-ghost btn-sm item-kategori-btn" data-kategori="operasional" id="itemKatOperasionalBtn">Operasional</button>
         </div>
         <div class="field" style="margin-bottom:10px;"><input type="text" id="itemSearchInput" placeholder="🔍 Cari item..."></div>
         <div class="table-wrap"><table class="compact-table">
@@ -529,6 +533,7 @@
               <option value="suplier">Suplier (isi harga &amp; modal)</option>
               <option value="keuangan">Pengawas Keuangan (PM/PO/Item)</option>
               <option value="do_maker">DO Maker (cetak DO saja, tanpa lihat harga)</option>
+              <option value="ops_maker">PO Ops Maker (PO &amp; Item operasional saja)</option>
               <option value="dapur">Monitoring (read-only)</option>
               <option value="investor">Investor (lihat semua termasuk modal, read-only)</option>
               <option value="admin">admin (akses penuh 1 SPPG)</option>
@@ -967,8 +972,8 @@ async function boot(){
 const TAB_DEFS = [
   { id:'approval', label:'Persetujuan SPPG', roles:['superadmin'] },
   { id:'pm', label:'PM', roles:['admin','keuangan'] },
-  { id:'po', label:'PO', roles:['admin','keuangan','suplier','dapur','investor','do_maker'] },
-  { id:'item', label:'Item Master', roles:['admin','keuangan'] },
+  { id:'po', label:'PO', roles:['admin','keuangan','suplier','dapur','investor','do_maker','ops_maker'] },
+  { id:'item', label:'Item Master', roles:['admin','keuangan','ops_maker'] },
   { id:'laporan', label:'Laporan', roles:['admin','suplier','investor'] },
   { id:'users', label:'Kelola User', roles:['admin','superadmin'] }
 ];
@@ -1212,18 +1217,26 @@ let poListCache = [];
 let poKategoriFilter = 'bahan baku'; // default sesuai permintaan
 
 async function loadPO(){
-  const canCreate = ['admin','keuangan'].includes(state.role);
+  const canCreate = ['admin','keuangan','ops_maker'].includes(state.role);
+  const canSendWaToSuplier = ['admin','keuangan'].includes(state.role); // ops_maker urusannya operasional, bukan suplier bahan baku
   const canPrintDo = ['admin','suplier','do_maker'].includes(state.role);
   const canInvoice = ['admin','suplier'].includes(state.role);
   document.getElementById('poFormCard').style.display = canCreate ? 'block' : 'none';
-  document.getElementById('openWaSendBtn').style.display = canCreate ? 'inline-flex' : 'none';
+  document.getElementById('openWaSendBtn').style.display = canSendWaToSuplier ? 'inline-flex' : 'none';
   document.getElementById('openWaSendDoBtn').style.display = (state.role === 'suplier') ? 'inline-flex' : 'none';
   document.getElementById('openPrintDoBtn').style.display = canPrintDo ? 'inline-flex' : 'none';
   document.getElementById('openInvoiceBtn').style.display = canInvoice ? 'inline-flex' : 'none';
 
+  // Kunci tombol kategori ke "Operasional" untuk PO Ops Maker -- tidak boleh lihat/pindah ke Bahan Baku sama sekali.
+  if(state.role === 'ops_maker'){
+    poKategoriFilter = 'operasional';
+    document.getElementById('poKatBahanBakuBtn').style.display = 'none';
+    document.getElementById('poKatOperasionalBtn').style.display = 'none';
+  }
+
   // Ambil Item master, daftar PO, & daftar PM SEKALIGUS (paralel), bukan bergantian -- lebih cepat.
-  // DO Maker tidak boleh lihat Kuota/Realisasi/Selisih sama sekali, jadi tidak usah tarik data PM-nya.
-  const canSeePmSummary = state.role !== 'do_maker';
+  // DO Maker & PO Ops Maker tidak boleh lihat Kuota/Realisasi/Selisih (data bahan baku) sama sekali.
+  const canSeePmSummary = !['do_maker','ops_maker'].includes(state.role);
   const [itemsResult, poResult, pmResult] = await Promise.allSettled([
     api('getItems', {}),
     api('getPO', {}),
@@ -1606,27 +1619,53 @@ function sortItemsForDisplay(list){
 }
 
 let itemRoleFlags = {};
+let itemKategoriFilter = 'bahan baku'; // default, sama seperti tab PO
 
 async function loadItemMaster(){
-  const canManageDescriptive = ['admin','keuangan'].includes(state.role);
+  const canManageDescriptive = ['admin','keuangan','ops_maker'].includes(state.role);
   const canEditModal = ['admin'].includes(state.role); // suplier sudah tidak akses Item Master lagi
   const canSeeModalRef = ['admin'].includes(state.role); // Modal Per Unit = referensi modal, dirahasiakan dari Keuangan
   const canDelete = ['admin','keuangan'].includes(state.role);
   itemRoleFlags = { canManageDescriptive, canEditModal, canSeeModalRef, canDelete };
   document.getElementById('itemFormCard').style.display = canManageDescriptive ? 'block' : 'none';
 
+  // PO Ops Maker cuma boleh lihat/kelola item Operasional -- kunci tombol kategorinya, sembunyikan pilihan Bahan Baku.
+  const katWrap = document.getElementById('itemKatBahanBakuBtn').parentElement;
+  if(state.role === 'ops_maker'){
+    itemKategoriFilter = 'operasional';
+    katWrap.style.display = 'none';
+    document.getElementById('itemKategoriField').style.display = 'none'; // dropdown Kategori di form Tambah/Edit juga disembunyikan (selalu operasional)
+    document.getElementById('itemKategori').value = 'operasional';
+  } else {
+    katWrap.style.display = '';
+    document.getElementById('itemKategoriField').style.display = '';
+  }
+
   let list = [];
   try{ list = await api('getItems', {}); } catch(e){ toast(e.message, true); return; }
   itemMasterCache = sortItemsForDisplay(list); // urut A-Z sekali di sini, dipakai ulang saat pencarian
 
-  renderItemMasterRows(itemMasterCache);
+  applyItemFilters();
 }
 
-document.getElementById('itemSearchInput').addEventListener('input', () => {
+function applyItemFilters(){
+  document.getElementById('itemKatBahanBakuBtn').className = 'btn btn-sm item-kategori-btn ' + (itemKategoriFilter === 'bahan baku' ? 'btn-accent' : 'btn-ghost');
+  document.getElementById('itemKatOperasionalBtn').className = 'btn btn-sm item-kategori-btn ' + (itemKategoriFilter === 'operasional' ? 'btn-accent' : 'btn-ghost');
+
+  let filtered = itemMasterCache.filter(it => String(it['Kategori']||'').trim().toLowerCase() === itemKategoriFilter);
   const q = document.getElementById('itemSearchInput').value.trim().toLowerCase();
-  const filtered = q ? itemMasterCache.filter(it => String(it['Item']||'').toLowerCase().includes(q)) : itemMasterCache;
+  if(q) filtered = filtered.filter(it => String(it['Item']||'').toLowerCase().includes(q));
   renderItemMasterRows(filtered);
+}
+
+document.querySelectorAll('.item-kategori-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    itemKategoriFilter = btn.dataset.kategori;
+    applyItemFilters();
+  });
 });
+
+document.getElementById('itemSearchInput').addEventListener('input', applyItemFilters);
 
 function renderItemMasterRows(list){
   const { canManageDescriptive, canEditModal, canSeeModalRef, canDelete } = itemRoleFlags;
@@ -1723,7 +1762,7 @@ function clearItemForm(){
   document.getElementById('itemNama').value = '';
   document.getElementById('itemSatuan').value = '';
   document.getElementById('itemGroup').value = '';
-  document.getElementById('itemKategori').value = 'bahan baku';
+  document.getElementById('itemKategori').value = (state.role === 'ops_maker') ? 'operasional' : 'bahan baku';
   document.getElementById('itemPorsi').value = '';
 }
 document.getElementById('clearItemBtn').addEventListener('click', clearItemForm);
@@ -1773,7 +1812,7 @@ document.getElementById('submitPoBtn').addEventListener('click', async () => {
       Group: group,
       Qty: Number(r.querySelector('.po-qty').value) || 0,
       Unit: r.querySelector('.po-unit').value.trim(),
-      Kategori: 'bahan baku'
+      Kategori: state.role === 'ops_maker' ? 'operasional' : 'bahan baku'
     });
   });
   if(!rows.length){ toast('Pilih minimal satu item', true); return; }
