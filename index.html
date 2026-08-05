@@ -1087,6 +1087,7 @@ let editingPmId = null; // ID PM yang sedang diedit (kalau tanggal yang dipilih 
 
 async function loadPM(){
   const canEdit = ['admin','keuangan'].includes(state.role);
+  const isAdmin = state.role === 'admin';
   document.getElementById('pmFormCard').style.display = canEdit ? 'block' : 'none';
   let list = [];
   try{ list = await api('getPM', {}); }catch(e){ toast(e.message, true); }
@@ -1097,12 +1098,22 @@ async function loadPM(){
   if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Belum ada data PM</td></tr>`; }
   list.forEach(pm => {
     const tr = document.createElement('tr');
-    const isReadOnly = !!pm['ReadOnly'];
-    const aksiCell = canEdit
-      ? (isReadOnly
-          ? `<td data-label=""><span class="helptext" title="Sudah lebih dari 10 hari sejak Mulai">🔒 Read-only</span></td>`
-          : `<td data-label=""><button class="btn btn-ghost btn-sm edit-pm-btn">Edit</button> <button class="btn btn-ghost btn-sm delete-pm-btn">Hapus</button></td>`)
-      : '';
+    const isReadOnly = !!pm['ReadOnly']; // untuk Admin selalu false (Admin selalu bisa edit/hapus)
+    const isManuallyUnlocked = String(pm['ManualUnlock']||'').toUpperCase() === 'YA';
+    const isAutoLocked = !!pm['AutoLocked']; // status kunci 10-hari mentah, dipakai Admin untuk tombol buka/tutup
+
+    let aksiCell = '';
+    if(canEdit){
+      const editDeleteBtns = isReadOnly
+        ? `<span class="helptext" title="Sudah lebih dari 10 hari sejak Mulai">🔒 Read-only</span>`
+        : `<button class="btn btn-ghost btn-sm edit-pm-btn">Edit</button> <button class="btn btn-ghost btn-sm delete-pm-btn">Hapus</button>`;
+      // Tombol buka/tutup kunci -- KHUSUS Admin, dan cuma tampil kalau PM ini memang sedang kena aturan 10 hari (relevan untuk dibuka/ditutup).
+      const lockToggleBtn = (isAdmin && isAutoLocked)
+        ? ` <button class="btn btn-ghost btn-sm toggle-pm-lock-btn" data-unlock="${!isManuallyUnlocked}">${isManuallyUnlocked ? '🔒 Tutup Lagi' : '🔓 Buka Kunci'}</button>`
+        : '';
+      aksiCell = `<td data-label="">${editDeleteBtns}${lockToggleBtn}</td>`;
+    }
+
     tr.innerHTML = `
       <td data-label="ID PM" class="mono">${pm['ID PM']}</td>
       <td data-label="Periode">${fmtDate(pm['Mulai'])} – ${fmtDate(pm['Sampai'])}</td>
@@ -1117,6 +1128,21 @@ async function loadPM(){
         if(!(await showConfirm('Hapus PM ' + pm['ID PM'] + '? Data yang dihapus tidak bisa dikembalikan.'))) return;
         try{ await api('deletePM', { id: pm['ID PM'] }); toast('PM dihapus'); loadPM(); }
         catch(e){ toast(e.message, true); }
+      });
+    }
+    const lockBtn = tr.querySelector('.toggle-pm-lock-btn');
+    if(lockBtn){
+      lockBtn.addEventListener('click', async () => {
+        const willUnlock = lockBtn.dataset.unlock === 'true';
+        const confirmMsg = willUnlock
+          ? `Buka kunci PM ${pm['ID PM']}? Keuangan akan bisa edit/hapus PM ini lagi walau sudah lebih dari 10 hari.`
+          : `Tutup kunci PM ${pm['ID PM']} lagi? Keuangan tidak akan bisa edit/hapus PM ini lagi.`;
+        if(!(await showConfirm(confirmMsg))) return;
+        try{
+          await api('togglePmLock', { id: pm['ID PM'], unlock: willUnlock });
+          toast(willUnlock ? 'Kunci dibuka' : 'Kunci ditutup lagi');
+          loadPM();
+        } catch(e){ toast(e.message, true); }
       });
     }
     tb.appendChild(tr);
@@ -1435,20 +1461,25 @@ function renderActivePmSummary(filteredList){
 
 function renderPOTable(list){
   const canFillPriceGeneral = ['admin','suplier'].includes(state.role); // boleh isi harga baris APA SAJA
-  const canFillPriceOpsOnly = ['keuangan','ops_maker'].includes(state.role); // boleh isi harga KHUSUS baris Operasional
+  const canFillPriceOpsOnly = ['ops_maker'].includes(state.role); // boleh isi harga KHUSUS baris Operasional
   const canSeeModal = ['admin','suplier','investor'].includes(state.role);
   const canEditModal = ['admin','suplier'].includes(state.role);
-  const canEditQty = ['admin','keuangan'].includes(state.role);
-  const canDelete = ['admin','keuangan'].includes(state.role);
+  const canEditQtyGeneral = ['admin'].includes(state.role); // boleh edit qty baris APA SAJA
+  const canEditQtyBahanBakuOnly = ['keuangan'].includes(state.role); // boleh edit qty KHUSUS baris Bahan Baku
+  const canEditQtyOpsOnly = ['ops_maker'].includes(state.role); // boleh edit qty KHUSUS baris Operasional
+  const canDeleteGeneral = ['admin'].includes(state.role); // boleh hapus baris APA SAJA
+  const canDeleteBahanBakuOnly = ['keuangan'].includes(state.role); // boleh hapus KHUSUS baris Bahan Baku
+  const canDeleteOpsOnly = ['ops_maker'].includes(state.role); // boleh hapus KHUSUS baris Operasional
+  const canDeleteAny = canDeleteGeneral || canDeleteBahanBakuOnly || canDeleteOpsOnly; // untuk tampilkan kolom header saja
 
   const head = document.getElementById('poTableHead');
   head.innerHTML = `<th>Item</th><th class="right">Qty</th><th>Satuan</th>
     <th class="right">Harga Satuan</th><th class="right">Jumlah</th>
     ${canSeeModal ? '<th class="right">Modal/Unit</th><th class="right">Total Modal</th>' : ''}
-    ${canDelete ? '<th></th>' : ''}`;
+    ${canDeleteAny ? '<th></th>' : ''}`;
 
   const tb = document.getElementById('poTableBody'); tb.innerHTML = '';
-  const colCount = 5 + (canSeeModal?2:0) + (canDelete?1:0);
+  const colCount = 5 + (canSeeModal?2:0) + (canDeleteAny?1:0);
   if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Belum ada PO</td></tr>`; return; }
 
   list.sort((a,b) => new Date(b['Tanggal']) - new Date(a['Tanggal']));
@@ -1477,12 +1508,14 @@ function renderPOTable(list){
       const tr = document.createElement('tr');
       const isOperasional = String(po['Kategori']||'').trim().toLowerCase() === 'operasional';
       const canFillPrice = canFillPriceGeneral || (canFillPriceOpsOnly && isOperasional); // per baris
+      const canEditThisQty = canEditQtyGeneral || (canEditQtyBahanBakuOnly && !isOperasional) || (canEditQtyOpsOnly && isOperasional);
+      const canDeleteThis = canDeleteGeneral || (canDeleteBahanBakuOnly && !isOperasional) || (canDeleteOpsOnly && isOperasional);
       if(canFillPrice){ tr.className = 'po-editable-row'; tr.dataset.id = po['ID']; }
       const statusDotClass = po['Status']==='menunggu harga' ? 'wait' : (po['Status']==='harga terisi' ? 'filled' : 'other');
       const priceCell = canFillPrice
         ? `<span class="tap-value ${po['Unit Price']?'':'tap-value-empty'}">${po['Unit Price'] ? fmtRupiah(po['Unit Price']) : 'Tap isi'}</span>`
         : `<span class="num">${po['Unit Price'] ? fmtRupiah(po['Unit Price']) : '-'}</span>`;
-      const qtyCell = canEditQty
+      const qtyCell = canEditThisQty
         ? `<input type="text" inputmode="decimal" class="price-input mono qty-input" value="${po['Qty']}" data-id="${po['ID']}">`
         : `${po['Qty']}`;
       const modalCells = canSeeModal ? `
@@ -1490,7 +1523,9 @@ function renderPOTable(list){
           ? `<span class="tap-value ${po['Modal Per Unit']?'':'tap-value-empty'}">${po['Modal Per Unit'] ? fmtRupiah(po['Modal Per Unit']) : 'Tap isi'}</span>`
           : `<span class="num">${po['Modal Per Unit'] ? fmtRupiah(po['Modal Per Unit']) : '-'}</span>`}</td>
         <td data-label="Total Modal" class="right num">${po['Total Modal'] ? fmtRupiah(po['Total Modal']) : '-'}</td>` : '';
-      const deleteCell = canDelete ? `<td data-label=""><button class="btn btn-ghost btn-sm delete-po-btn" data-id="${po['ID']}" title="Hapus">✕</button></td>` : '';
+      const deleteCell = canDeleteAny
+        ? `<td data-label="">${canDeleteThis ? `<button class="btn btn-ghost btn-sm delete-po-btn" data-id="${po['ID']}" title="Hapus">✕</button>` : ''}</td>`
+        : '';
       tr.innerHTML = `
         <td data-label="Item" title="${po['Item']} — ${po['Status']}"><span class="status-dot ${statusDotClass}"></span><span class="po-item-name">${po['Item']}</span></td>
         <td data-label="Qty" class="right num">${qtyCell}</td>
@@ -1507,35 +1542,31 @@ function renderPOTable(list){
   tb.querySelectorAll('.po-editable-row').forEach(row => {
     row.addEventListener('click', () => openPoPriceEditor(row.dataset.id, list));
   });
-  if(canEditQty){
-    tb.querySelectorAll('.qty-input').forEach(inp => {
-      inp.addEventListener('click', (e) => e.stopPropagation()); // jangan sampai memicu popup harga (khusus admin yang punya keduanya)
-      inp.addEventListener('change', async (e) => {
-        e.stopPropagation();
-        if(inp.disabled) return; // cegah kirim ganda kalau change sempat terpicu 2x
-        const raw = inp.value.trim().replace(',', '.'); // terima format koma desimal (mis. "3,5")
-        const newQty = parseFloat(raw);
-        if(!raw || isNaN(newQty) || newQty <= 0 || newQty > 1000000){
-          toast('Qty tidak valid, harus angka lebih dari 0', true);
-          loadPO();
-          return;
-        }
-        inp.disabled = true;
-        try{ await api('updatePOItemQty', { id: inp.dataset.id, data:{ Qty: newQty } }); toast('Qty diperbarui'); loadPO(); }
-        catch(err){ toast(err.message, true); loadPO(); }
-      });
+  tb.querySelectorAll('.qty-input').forEach(inp => {
+    inp.addEventListener('click', (e) => e.stopPropagation()); // jangan sampai memicu popup harga (khusus admin yang punya keduanya)
+    inp.addEventListener('change', async (e) => {
+      e.stopPropagation();
+      if(inp.disabled) return; // cegah kirim ganda kalau change sempat terpicu 2x
+      const raw = inp.value.trim().replace(',', '.'); // terima format koma desimal (mis. "3,5")
+      const newQty = parseFloat(raw);
+      if(!raw || isNaN(newQty) || newQty <= 0 || newQty > 1000000){
+        toast('Qty tidak valid, harus angka lebih dari 0', true);
+        loadPO();
+        return;
+      }
+      inp.disabled = true;
+      try{ await api('updatePOItemQty', { id: inp.dataset.id, data:{ Qty: newQty } }); toast('Qty diperbarui'); loadPO(); }
+      catch(err){ toast(err.message, true); loadPO(); }
     });
-  }
-  if(canDelete){
-    tb.querySelectorAll('.delete-po-btn').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation(); // jangan sampai memicu buka popup edit harga juga
-        if(!(await showConfirm('Hapus PO ini? Data yang dihapus tidak bisa dikembalikan.'))) return;
-        try{ await api('deletePO', { id: btn.dataset.id }); toast('PO dihapus'); loadPO(); }
-        catch(e){ toast(e.message, true); }
-      });
+  });
+  tb.querySelectorAll('.delete-po-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation(); // jangan sampai memicu buka popup edit harga juga
+      if(!(await showConfirm('Hapus PO ini? Data yang dihapus tidak bisa dikembalikan.'))) return;
+      try{ await api('deletePO', { id: btn.dataset.id }); toast('PO dihapus'); loadPO(); }
+      catch(e){ toast(e.message, true); }
     });
-  }
+  });
 }
 
 /* ---------------- POPUP ISI HARGA SATUAN & MODAL/UNIT (Suplier/Admin) ---------------- */
@@ -1619,8 +1650,14 @@ function addPoRow(){
   applyPoTanggalRange(tanggalInput); // kunci min/max sesuai Periode yang sedang dipilih
 
   // PO Ops Maker selalu Operasional -- centang otomatis, terkunci, tidak bisa diubah ke Bahan Baku.
+  // Keuangan sebaliknya selalu Bahan Baku -- kotak centang dikunci kosong, tidak bisa dicentang ke Operasional.
+  // Cuma Admin yang bebas isi keduanya (checkbox tetap aktif & terlihat).
   if(state.role === 'ops_maker'){
     operasionalCheckbox.checked = true;
+    operasionalCheckbox.disabled = true;
+    div.querySelector('.po-operasional-field').style.display = 'none'; // tidak perlu ditampilkan, sudah pasti
+  } else if(state.role === 'keuangan'){
+    operasionalCheckbox.checked = false;
     operasionalCheckbox.disabled = true;
     div.querySelector('.po-operasional-field').style.display = 'none'; // tidak perlu ditampilkan, sudah pasti
   }
@@ -1687,19 +1724,27 @@ let itemKategoriFilter = 'bahan baku'; // default, sama seperti tab PO
 async function loadItemMaster(){
   const canManageDescriptive = ['admin','keuangan','ops_maker'].includes(state.role);
   const canEditUnitPriceGeneral = ['admin'].includes(state.role); // boleh isi Unit Price item APA SAJA
-  const canEditUnitPriceOpsOnly = ['keuangan','ops_maker'].includes(state.role); // boleh isi Unit Price KHUSUS item Operasional
+  const canEditUnitPriceOpsOnly = ['ops_maker'].includes(state.role); // boleh isi Unit Price KHUSUS item Operasional
   const canSeeModalRef = ['admin'].includes(state.role); // Modal Per Unit = referensi modal, dirahasiakan dari Keuangan
-  const canDelete = ['admin','keuangan'].includes(state.role);
-  itemRoleFlags = { canManageDescriptive, canEditUnitPriceGeneral, canEditUnitPriceOpsOnly, canSeeModalRef, canDelete };
+  const canDeleteGeneral = ['admin'].includes(state.role); // boleh hapus item APA SAJA
+  const canDeleteBahanBakuOnly = ['keuangan'].includes(state.role); // boleh hapus KHUSUS item Bahan Baku
+  const canDeleteOpsOnly = ['ops_maker'].includes(state.role); // boleh hapus KHUSUS item Operasional
+  itemRoleFlags = { canManageDescriptive, canEditUnitPriceGeneral, canEditUnitPriceOpsOnly, canSeeModalRef, canDeleteGeneral, canDeleteBahanBakuOnly, canDeleteOpsOnly };
   document.getElementById('itemFormCard').style.display = canManageDescriptive ? 'block' : 'none';
 
   // PO Ops Maker cuma boleh lihat/kelola item Operasional -- kunci tombol kategorinya, sembunyikan pilihan Bahan Baku.
+  // Keuangan sebaliknya cuma boleh lihat/kelola item Bahan Baku -- kunci ke situ, sembunyikan pilihan Operasional.
   const katWrap = document.getElementById('itemKatBahanBakuBtn').parentElement;
   if(state.role === 'ops_maker'){
     itemKategoriFilter = 'operasional';
     katWrap.style.display = 'none';
     document.getElementById('itemKategoriField').style.display = 'none'; // dropdown Kategori di form Tambah/Edit juga disembunyikan (selalu operasional)
     document.getElementById('itemKategori').value = 'operasional';
+  } else if(state.role === 'keuangan'){
+    itemKategoriFilter = 'bahan baku';
+    katWrap.style.display = 'none';
+    document.getElementById('itemKategoriField').style.display = 'none'; // dropdown Kategori di form Tambah/Edit juga disembunyikan (selalu bahan baku)
+    document.getElementById('itemKategori').value = 'bahan baku';
   } else {
     katWrap.style.display = '';
     document.getElementById('itemKategoriField').style.display = '';
@@ -1732,7 +1777,10 @@ document.querySelectorAll('.item-kategori-btn').forEach(btn => {
 document.getElementById('itemSearchInput').addEventListener('input', applyItemFilters);
 
 function renderItemMasterRows(list){
-  const { canManageDescriptive, canEditUnitPriceGeneral, canEditUnitPriceOpsOnly, canSeeModalRef, canDelete } = itemRoleFlags;
+  const { canManageDescriptive, canEditUnitPriceGeneral, canEditUnitPriceOpsOnly, canSeeModalRef, canDeleteGeneral, canDeleteBahanBakuOnly, canDeleteOpsOnly } = itemRoleFlags;
+  // Daftar item yang masuk ke sini SUDAH difilter backend sesuai kategori yang boleh dilihat role ini
+  // (Keuangan cuma dapat bahan baku, Ops Maker cuma dapat operasional) -- jadi cukup gabungan OR biasa.
+  const canDelete = canDeleteGeneral || canDeleteBahanBakuOnly || canDeleteOpsOnly;
 
   const head = document.getElementById('itemTableHead');
   head.innerHTML = `<th>Item</th><th>Satuan</th><th>Group</th><th>Kategori</th>
