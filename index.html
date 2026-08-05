@@ -200,6 +200,7 @@
     <h1>Pengadaan Bahan Baku SPPG</h1>
     <p>Masuk dengan akun Google terdaftar</p>
     <div id="gsiBtn"></div>
+    <p class="helptext" id="loginLoading" style="display:none; margin-top:10px;">⏳ Memverifikasi akun...</p>
     <div class="errtext" id="loginError"></div>
     <button class="btn btn-ghost btn-sm" id="installAppBtn" style="display:none; width:100%; justify-content:center; margin-top:14px;">⬇ Pasang Aplikasi "PO SPPG" ke Layar HP</button>
     <p class="helptext" id="iosInstallHint" style="display:none; margin-top:12px;">
@@ -817,7 +818,7 @@ window.onload = () => {
     document.getElementById('loginError').textContent = 'Aplikasi belum dikonfigurasi (Client ID kosong). Hubungi admin.';
     return;
   }
-  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogleCredential });
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogleCredential, use_fedcm_for_button: true });
   google.accounts.id.renderButton(document.getElementById('gsiBtn'), { theme:'outline', size:'large', shape:'pill', text:'signin_with' });
 };
 
@@ -849,6 +850,9 @@ if(isIos && !isInStandaloneMode){
 }
 
 async function onGoogleCredential(response){
+  document.getElementById('loginError').textContent = '';
+  document.getElementById('gsiBtn').style.display = 'none'; // sembunyikan tombol supaya tidak diklik dobel selagi proses
+  document.getElementById('loginLoading').style.display = 'block';
   try{
     state.idToken = response.credential;
     const json = await postWithRetry_({ action:'login', idToken: state.idToken });
@@ -864,6 +868,9 @@ async function onGoogleCredential(response){
     }
   } catch(err){
     document.getElementById('loginError').textContent = err.message;
+    document.getElementById('gsiBtn').style.display = 'block';
+  } finally {
+    document.getElementById('loginLoading').style.display = 'none';
   }
 }
 
