@@ -1097,7 +1097,12 @@ async function loadPM(){
   if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Belum ada data PM</td></tr>`; }
   list.forEach(pm => {
     const tr = document.createElement('tr');
-    const aksiCell = canEdit ? `<td data-label=""><button class="btn btn-ghost btn-sm edit-pm-btn">Edit</button> <button class="btn btn-ghost btn-sm delete-pm-btn">Hapus</button></td>` : '';
+    const isReadOnly = !!pm['ReadOnly'];
+    const aksiCell = canEdit
+      ? (isReadOnly
+          ? `<td data-label=""><span class="helptext" title="Sudah lebih dari 10 hari sejak Mulai">🔒 Read-only</span></td>`
+          : `<td data-label=""><button class="btn btn-ghost btn-sm edit-pm-btn">Edit</button> <button class="btn btn-ghost btn-sm delete-pm-btn">Hapus</button></td>`)
+      : '';
     tr.innerHTML = `
       <td data-label="ID PM" class="mono">${pm['ID PM']}</td>
       <td data-label="Periode">${fmtDate(pm['Mulai'])} – ${fmtDate(pm['Sampai'])}</td>
@@ -1106,7 +1111,7 @@ async function loadPM(){
       <td data-label="Selisih" class="right num" style="color:${pm['Selisih']<0?'var(--danger)':'var(--ok)'}">${fmtRupiah(pm['Selisih'])}</td>
       ${aksiCell}
     `;
-    if(canEdit){
+    if(canEdit && !isReadOnly){
       tr.querySelector('.edit-pm-btn').addEventListener('click', () => startEditPm(pm));
       tr.querySelector('.delete-pm-btn').addEventListener('click', async () => {
         if(!(await showConfirm('Hapus PM ' + pm['ID PM'] + '? Data yang dihapus tidak bisa dikembalikan.'))) return;
@@ -1226,8 +1231,9 @@ let itemMasterCache = [];
 function loadPmDropdownForPO(list){
   const sel = document.getElementById('poFormPm');
   const prevValue = sel.value;
-  sel.innerHTML = list.map(p => `<option value="${p['ID PM']}">${fmtDate(p['Mulai'])} - ${fmtDate(p['Sampai'])}</option>`).join('');
-  if(prevValue && list.some(p => p['ID PM'] === prevValue)) sel.value = prevValue;
+  const selectable = list.filter(p => !p['ReadOnly']); // periode yang sudah lebih dari 10 hari tidak muncul lagi -- sudah tidak untuk buat PO baru
+  sel.innerHTML = selectable.map(p => `<option value="${p['ID PM']}">${fmtDate(p['Mulai'])} - ${fmtDate(p['Sampai'])}</option>`).join('');
+  if(prevValue && selectable.some(p => p['ID PM'] === prevValue)) sel.value = prevValue;
 }
 
 let poListCache = [];
@@ -1290,14 +1296,15 @@ async function loadPO(){
 function populateSummaryPmSelect(list){
   const sel = document.getElementById('poSummaryPmSelect');
   const prevValue = sel.value;
-  sel.innerHTML = list.map(pm => `<option value="${pm['ID PM']}">${pm['ID PM']} · ${fmtDate(pm['Mulai'])} – ${fmtDate(pm['Sampai'])}</option>`).join('');
+  const selectable = list.filter(pm => !pm['ReadOnly']); // periode yang sudah lebih dari 10 hari sejak Mulai tidak ditampilkan lagi
+  sel.innerHTML = selectable.map(pm => `<option value="${pm['ID PM']}">${pm['ID PM']} · ${fmtDate(pm['Mulai'])} – ${fmtDate(pm['Sampai'])}</option>`).join('');
 
-  if(prevValue && list.some(pm => pm['ID PM'] === prevValue)){
+  if(prevValue && selectable.some(pm => pm['ID PM'] === prevValue)){
     sel.value = prevValue; // pertahankan pilihan pengguna kalau masih ada (mis. setelah refresh data)
     return;
   }
   const todayStr = isoDate(new Date()); // tanggal perangkat pengguna
-  const defaultPm = list.find(pm => todayStr >= isoDate(pm['Mulai']) && todayStr <= isoDate(pm['Sampai']));
+  const defaultPm = selectable.find(pm => todayStr >= isoDate(pm['Mulai']) && todayStr <= isoDate(pm['Sampai']));
   if(defaultPm) sel.value = defaultPm['ID PM'];
 }
 
