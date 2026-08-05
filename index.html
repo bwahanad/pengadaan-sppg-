@@ -742,13 +742,14 @@ async function refreshView(btn, loadFn){
   }
 }
 
-function showConfirm(message){
+function showConfirm(message, yesLabel){
   return new Promise((resolve) => {
     const overlay = document.getElementById('confirmOverlay');
     document.getElementById('confirmMessage').textContent = message;
     overlay.classList.add('show');
     const yesBtn = document.getElementById('confirmYesBtn');
     const noBtn = document.getElementById('confirmNoBtn');
+    yesBtn.textContent = yesLabel || 'Ya, Hapus';
     const cleanup = (result) => {
       overlay.classList.remove('show');
       yesBtn.removeEventListener('click', onYes);
@@ -1104,14 +1105,14 @@ async function loadPM(){
 
     let aksiCell = '';
     if(canEdit){
-      const editDeleteBtns = isReadOnly
+      const editBtn = isReadOnly
         ? `<span class="helptext" title="Sudah lebih dari 10 hari sejak Mulai">🔒 Read-only</span>`
-        : `<button class="btn btn-ghost btn-sm edit-pm-btn">Edit</button> <button class="btn btn-ghost btn-sm delete-pm-btn">Hapus</button>`;
+        : `<button class="btn btn-ghost btn-sm edit-pm-btn">Edit</button>`;
       // Tombol buka/tutup kunci -- KHUSUS Admin, dan cuma tampil kalau PM ini memang sedang kena aturan 10 hari (relevan untuk dibuka/ditutup).
       const lockToggleBtn = (isAdmin && isAutoLocked)
         ? ` <button class="btn btn-ghost btn-sm toggle-pm-lock-btn" data-unlock="${!isManuallyUnlocked}">${isManuallyUnlocked ? '🔒 Tutup Lagi' : '🔓 Buka Kunci'}</button>`
         : '';
-      aksiCell = `<td data-label="">${editDeleteBtns}${lockToggleBtn}</td>`;
+      aksiCell = `<td data-label="">${editBtn}${lockToggleBtn}</td>`;
     }
 
     tr.innerHTML = `
@@ -1124,11 +1125,6 @@ async function loadPM(){
     `;
     if(canEdit && !isReadOnly){
       tr.querySelector('.edit-pm-btn').addEventListener('click', () => startEditPm(pm));
-      tr.querySelector('.delete-pm-btn').addEventListener('click', async () => {
-        if(!(await showConfirm('Hapus PM ' + pm['ID PM'] + '? Data yang dihapus tidak bisa dikembalikan.'))) return;
-        try{ await api('deletePM', { id: pm['ID PM'] }); toast('PM dihapus'); loadPM(); }
-        catch(e){ toast(e.message, true); }
-      });
     }
     const lockBtn = tr.querySelector('.toggle-pm-lock-btn');
     if(lockBtn){
@@ -1137,7 +1133,8 @@ async function loadPM(){
         const confirmMsg = willUnlock
           ? `Buka kunci PM ${pm['ID PM']}? Keuangan akan bisa edit/hapus PM ini lagi walau sudah lebih dari 10 hari.`
           : `Tutup kunci PM ${pm['ID PM']} lagi? Keuangan tidak akan bisa edit/hapus PM ini lagi.`;
-        if(!(await showConfirm(confirmMsg))) return;
+        const yesLabel = willUnlock ? 'Ya, Buka Kunci' : 'Ya, Tutup Kunci';
+        if(!(await showConfirm(confirmMsg, yesLabel))) return;
         try{
           await api('togglePmLock', { id: pm['ID PM'], unlock: willUnlock });
           toast(willUnlock ? 'Kunci dibuka' : 'Kunci ditutup lagi');
@@ -1301,6 +1298,7 @@ async function loadPO(){
     pmListCache = pmResult.value;
     if(canCreate) loadPmDropdownForPO(pmListCache); // dropdown "Periode" di form Buat PO (khusus yang bisa buat PO)
     populateSummaryPmSelect(pmListCache); // dropdown "ID PM" ringkasan -- untuk role yang boleh lihat (bukan DO Maker)
+    await ensurePoDataForPm(getSelectedPmForSummary()); // pastikan data PO lengkap untuk PM yang otomatis terpilih (bukan cuma saat ganti dropdown manual)
   } else {
     pmListCache = [];
     document.getElementById('poActivePmSummary').style.display = 'none';
@@ -1376,27 +1374,34 @@ document.querySelectorAll('.po-kategori-btn').forEach(btn => {
   });
 });
 
-document.getElementById('poSummaryPmSelect').addEventListener('change', async () => {
-  const activePm = getSelectedPmForSummary();
-  if(activePm){
-    const mulaiMinusOne = new Date(activePm['Mulai']);
-    mulaiMinusOne.setDate(mulaiMinusOne.getDate() - 1);
-    const neededFrom = isoDate(mulaiMinusOne);
-    // Backend cuma kirim ~800 baris PO terbaru secara default -- kalau PM yang baru dipilih ternyata
-    // periodenya LEBIH TUA dari data yang sudah ada di HP sekarang, tarik data yang KURANG itu saja
-    // dari server, lalu GABUNGKAN ke data yang sudah ada (bukan menimpa) supaya kalau nanti balik
-    // lagi ke periode yang lebih baru, datanya tidak hilang.
-    const oldestLoaded = poListCache.length
-      ? poListCache.reduce((min, po) => { const d = isoDate(po['Tanggal']); return (!min || d < min) ? d : min; }, null)
-      : null;
-    if(!oldestLoaded || neededFrom < oldestLoaded){
-      try{
-        const extra = await api('getPO', { from: neededFrom, to: oldestLoaded || isoDate(activePm['Sampai']) });
-        const existingIds = new Set(poListCache.map(po => po['ID']));
-        extra.forEach(po => { if(!existingIds.has(po['ID'])) poListCache.push(po); });
-      } catch(e){ toast(e.message, true); }
-    }
+/**
+ * Pastikan poListCache mencakup rentang tanggal PM ini (H-1 s/d Sampai). Backend cuma kirim ~800
+ * baris PO terbaru secara default -- kalau PM ini periodenya LEBIH TUA dari data yang sudah ada di
+ * HP sekarang, tarik data yang KURANG itu saja dari server, lalu GABUNGKAN ke data yang sudah ada
+ * (bukan menimpa) supaya kalau nanti balik lagi ke periode yang lebih baru, datanya tidak hilang.
+ * Dipakai baik saat dropdown "ID PM" diganti manual, MAUPUN saat halaman pertama kali dimuat --
+ * supaya PM yang otomatis terpilih (mis. PM lama yang baru dibuka kuncinya oleh Admin) datanya juga
+ * langsung lengkap, tidak perlu ganti-ganti dropdown dulu baru muncul.
+ */
+async function ensurePoDataForPm(pm){
+  if(!pm) return;
+  const mulaiMinusOne = new Date(pm['Mulai']);
+  mulaiMinusOne.setDate(mulaiMinusOne.getDate() - 1);
+  const neededFrom = isoDate(mulaiMinusOne);
+  const oldestLoaded = poListCache.length
+    ? poListCache.reduce((min, po) => { const d = isoDate(po['Tanggal']); return (!min || d < min) ? d : min; }, null)
+    : null;
+  if(!oldestLoaded || neededFrom < oldestLoaded){
+    try{
+      const extra = await api('getPO', { from: neededFrom, to: oldestLoaded || isoDate(pm['Sampai']) });
+      const existingIds = new Set(poListCache.map(po => po['ID']));
+      extra.forEach(po => { if(!existingIds.has(po['ID'])) poListCache.push(po); });
+    } catch(e){ toast(e.message, true); }
   }
+}
+
+document.getElementById('poSummaryPmSelect').addEventListener('change', async () => {
+  await ensurePoDataForPm(getSelectedPmForSummary());
   renderPoKategoriView();
 });
 
