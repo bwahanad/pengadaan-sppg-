@@ -340,7 +340,7 @@
         <div class="card-head">
           <h2>Kalkulator Matriks Menu</h2>
         </div>
-        <p class="helptext" style="margin:-6px 0 12px;">Tiap sel bisa pilih lebih dari 1 item (tap sel untuk buka pilihan). Harga pakai referensi harga satuan tertinggi (Item Master), dikali porsi PM hari itu (kecil + besar).</p>
+        <p class="helptext" style="margin:-6px 0 12px;">Tiap sel bisa pilih lebih dari 1 item (tap sel untuk buka pilihan). Harga per porsi dihitung dari transaksi Total Belanja tertinggi item itu di histori PO, dibagi porsi PM pada hari transaksi itu terjadi — lalu dikali porsi PM hari yang sedang dihitung.</p>
         <div class="field" style="max-width:320px; margin-bottom:14px;">
           <label>PM</label>
           <select id="menuCalcPmSelect"></select>
@@ -1266,14 +1266,14 @@ function menuCalcItemsInGroup(group){
 const MENU_CALC_BUMBU_AVG_KEY = '__avg__'; // penanda khusus "pakai bumbu (harga rata-rata)" untuk 1 hari
 let menuCalcBumbuMode = 'rata-rata'; // 'rata-rata' (1 harga gabungan) atau 'per-item' (pilih satu-satu)
 
-/** Harga rata-rata semua item Bumbu (dari Item Master, Unit Price referensi tertinggi). */
+/** Harga rata-rata semua item Bumbu (harga per porsi). */
 function menuCalcBumbuAvgPrice(){
   const items = menuCalcItemsInGroup('Bumbu');
   if(!items.length) return 0;
-  return items.reduce((s, it) => s + it.unitPrice, 0) / items.length;
+  return items.reduce((s, it) => s + it.hargaPerPorsi, 0) / items.length;
 }
 
-/** Biaya 1 sel (Group x Hari) = jumlah Unit Price item yang dipilih di sel itu x porsi hari itu. */
+/** Biaya 1 sel (Group x Hari) = jumlah Harga Per Porsi item yang dipilih di sel itu x porsi hari itu. */
 function menuCalcCellCost(group, day){
   const porsi = menuCalcPorsiPerDay[day] || 0;
   if(group === 'Bumbu' && menuCalcBumbuMode === 'rata-rata'){
@@ -1282,10 +1282,10 @@ function menuCalcCellCost(group, day){
   }
   const selected = menuCalcSelections[group][day];
   if(!selected || !selected.size) return 0;
-  const sumUnitPrice = menuCalcItemsInGroup(group)
+  const sumHargaPerPorsi = menuCalcItemsInGroup(group)
     .filter(it => selected.has(it.Item.toLowerCase()))
-    .reduce((s, it) => s + it.unitPrice, 0);
-  return sumUnitPrice * porsi;
+    .reduce((s, it) => s + it.hargaPerPorsi, 0);
+  return sumHargaPerPorsi * porsi;
 }
 
 function renderMenuCalcMatrix(){
@@ -1407,7 +1407,7 @@ function openMenuCalcCellPicker(group, day){
         <div class="wa-check ${checked?'selected':''}"></div>
         <div class="wa-item-info">
           <div class="nm">${it.Item}</div>
-          <div class="meta">${fmtRupiah(it.unitPrice)} / ${it.Satuan||'-'}</div>
+          <div class="meta">${fmtRupiah(it.hargaPerPorsi)} / porsi</div>
         </div>
       </div>`;
     }).join('');
