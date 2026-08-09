@@ -1027,7 +1027,7 @@ const TAB_DEFS = [
   { id:'approval', label:'Persetujuan SPPG', roles:['superadmin'] },
   { id:'pm', label:'PM', roles:['admin','keuangan'] },
   { id:'po', label:'PO', roles:['admin','keuangan','suplier','dapur','investor','do_maker','ops_maker'] },
-  { id:'item', label:'Item Master', roles:['admin','keuangan','ops_maker'] },
+  { id:'item', label:'Item Master', roles:['admin','keuangan','ops_maker','suplier'] },
   { id:'laporan', label:'Laporan', roles:['admin','suplier','investor'] },
   { id:'users', label:'Kelola User', roles:['admin','superadmin'] }
 ];
@@ -1253,6 +1253,7 @@ async function loadMenuCalcData(pmId){
 
   menuCalcItemsCache = result.items || [];
   menuCalcPorsiPerDay = result.porsiPerDay || {};
+  menuCalcBumbuAvgHargaPerPorsi = result.bumbuAvgHargaPerPorsi || 0;
   renderMenuCalcMatrix();
 }
 
@@ -1265,12 +1266,11 @@ function menuCalcItemsInGroup(group){
 
 const MENU_CALC_BUMBU_AVG_KEY = '__avg__'; // penanda khusus "pakai bumbu (harga rata-rata)" untuk 1 hari
 let menuCalcBumbuMode = 'rata-rata'; // 'rata-rata' (1 harga gabungan) atau 'per-item' (pilih satu-satu)
+let menuCalcBumbuAvgHargaPerPorsi = 0; // dihitung server tiap Sabtu 23:20 (total belanja Bumbu / total porsi semua PM)
 
-/** Harga rata-rata semua item Bumbu (harga per porsi). */
+/** Harga rata-rata Bumbu (dihitung server tiap Sabtu malam, bukan dihitung ulang di sini). */
 function menuCalcBumbuAvgPrice(){
-  const items = menuCalcItemsInGroup('Bumbu');
-  if(!items.length) return 0;
-  return items.reduce((s, it) => s + it.hargaPerPorsi, 0) / items.length;
+  return menuCalcBumbuAvgHargaPerPorsi;
 }
 
 /** Biaya 1 sel (Group x Hari) = jumlah Harga Per Porsi item yang dipilih di sel itu x porsi hari itu. */
@@ -2081,6 +2081,8 @@ function renderItemMasterRows(list){
   // Daftar item yang masuk ke sini SUDAH difilter backend sesuai kategori yang boleh dilihat role ini
   // (Keuangan cuma dapat bahan baku, Ops Maker cuma dapat operasional) -- jadi cukup gabungan OR biasa.
   const canDelete = canDeleteGeneral || canDeleteBahanBakuOnly || canDeleteOpsOnly;
+  // Qty per Unit boleh diisi Admin, Keuangan, Ops Maker (biasa via form penuh), DAN Suplier (khusus kolom ini saja, inline).
+  const canEditQtyPerUnit = ['admin','keuangan','ops_maker','suplier'].includes(state.role);
 
   const head = document.getElementById('itemTableHead');
   head.innerHTML = `<th>Item</th><th>Satuan</th><th>Group</th><th>Kategori</th>
@@ -2103,7 +2105,9 @@ function renderItemMasterRows(list){
     const qtyPerUnit = Number(it['Qty per Unit']) || 0;
     const unitPrice = Number(it['Unit Price']) || 0;
     const hargaPerPorsi = qtyPerUnit > 0 ? unitPrice / qtyPerUnit : 0;
-    const qtyPerUnitCell = `<td data-label="Qty per Unit" class="right num">${qtyPerUnit || '-'}</td>`;
+    const qtyPerUnitCell = `<td data-label="Qty per Unit" class="right">${canEditQtyPerUnit
+      ? `<input class="price-input mono item-qtyperunit-input" type="number" step="any" value="${qtyPerUnit||''}" placeholder="isi" data-id="${it['ID']}">`
+      : `<span class="num">${qtyPerUnit || '-'}</span>`}</td>`;
     const hargaPerPorsiCell = `<td data-label="Harga per Porsi" class="right num">${hargaPerPorsi ? fmtRupiah(hargaPerPorsi) : '-'}</td>`;
     const modalRefCell = canSeeModalRef
       ? `<td data-label="Modal Per Unit" class="right num">${it['Modal Per Unit'] ? fmtRupiah(it['Modal Per Unit']) : '-'}</td>` : '';
@@ -2135,6 +2139,16 @@ function renderItemMasterRows(list){
         } else {
           toast('Unit Price tersimpan');
         }
+        loadItemMaster();
+      }
+      catch(e){ toast(e.message, true); }
+    });
+  });
+  tb.querySelectorAll('.item-qtyperunit-input').forEach(inp => {
+    inp.addEventListener('change', async () => {
+      try{
+        await api('saveItemQtyPerUnit', { id: inp.dataset.id, qtyPerUnit: Number(inp.value) || 0 });
+        toast('Qty per Unit tersimpan');
         loadItemMaster();
       }
       catch(e){ toast(e.message, true); }
