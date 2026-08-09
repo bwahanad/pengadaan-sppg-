@@ -1223,15 +1223,15 @@ function selectPmForMenuCalc(pmId){
 function populateMenuCalcPmSelect(list){
   const sel = document.getElementById('menuCalcPmSelect');
   const prevValue = sel.value;
-  // Kalkulator ini untuk RENCANA ke depan, dan cuma untuk PM yang masih bisa diedit (belum read-only/terkunci).
-  const todayStr = isoDate(new Date());
-  const upcoming = list.filter(pm => isoDate(pm['Sampai']) >= todayStr && !pm['ReadOnly']);
+  // Sama persis dengan status "Edit" di Daftar PM -- PM yang masih bisa diedit (belum read-only/terkunci) bisa dipilih di sini.
+  const editable = list.filter(pm => !pm['ReadOnly']);
   sel.innerHTML = '<option value="">Pilih PM</option>' +
-    upcoming.map(pm => `<option value="${pm['ID PM']}">${pm['ID PM']} · ${fmtDate(pm['Mulai'])} – ${fmtDate(pm['Sampai'])}</option>`).join('');
-  if(prevValue && upcoming.some(pm => pm['ID PM'] === prevValue)){
+    editable.map(pm => `<option value="${pm['ID PM']}">${pm['ID PM']} · ${fmtDate(pm['Mulai'])} – ${fmtDate(pm['Sampai'])}</option>`).join('');
+  if(prevValue && editable.some(pm => pm['ID PM'] === prevValue)){
     sel.value = prevValue;
   } else {
-    const defaultPm = upcoming.find(pm => todayStr >= isoDate(pm['Mulai']) && todayStr <= isoDate(pm['Sampai']));
+    const todayStr = isoDate(new Date());
+    const defaultPm = editable.find(pm => todayStr >= isoDate(pm['Mulai']) && todayStr <= isoDate(pm['Sampai']));
     if(defaultPm) sel.value = defaultPm['ID PM'];
   }
   if(sel.value) loadMenuCalcData(sel.value);
