@@ -338,22 +338,32 @@
 
       <div class="card" id="menuCalcCard" style="display:none;">
         <div class="card-head">
-          <h2>Kalkulator Susunan Bahan Baku</h2>
+          <h2>Kalkulator Matriks Menu</h2>
         </div>
-        <p class="helptext" style="margin:-6px 0 12px;">Centang bahan yang mau dipakai di tiap kelompok, sistem hitung proyeksi biayanya otomatis berdasarkan rata-rata harga per porsi dari histori PO.</p>
+        <p class="helptext" style="margin:-6px 0 12px;">Tiap sel bisa pilih lebih dari 1 item (tap sel untuk buka pilihan). Harga pakai referensi harga satuan tertinggi (Item Master), dikali porsi PM hari itu (kecil + besar).</p>
         <div class="field" style="max-width:320px; margin-bottom:14px;">
           <label>PM</label>
           <select id="menuCalcPmSelect"></select>
         </div>
-        <div id="menuCalcTotalWrap" style="display:none; margin-bottom:14px;">
-          <div class="summary-item">
-            <div class="label">Total Proyeksi Biaya (item terpilih)</div>
-            <div class="value" id="menuCalcTotal">Rp0</div>
-          </div>
-        </div>
-        <div id="menuCalcGroups"></div>
+        <div class="table-wrap"><table class="compact-table" id="menuCalcMatrix" style="display:none;">
+          <thead><tr id="menuCalcMatrixHead"></tr></thead>
+          <tbody id="menuCalcMatrixBody"></tbody>
+          <tfoot><tr id="menuCalcMatrixFoot"></tr></tfoot>
+        </table></div>
       </div>
     </section>
+
+    <!-- Popup pilih item multi-centang untuk 1 sel matriks (Group x Hari) -->
+    <div class="confirm-overlay" id="menuCalcCellOverlay">
+      <div class="confirm-box" style="max-width:380px; text-align:left;">
+        <h3 id="menuCalcCellTitle" style="margin:0 0 12px; font-size:18px;"></h3>
+        <div id="menuCalcCellItemList" style="max-height:320px; overflow-y:auto;"></div>
+        <div class="confirm-actions" style="margin-top:16px;">
+          <button class="btn btn-ghost btn-sm" id="menuCalcCellCancelBtn">Batal</button>
+          <button class="btn btn-accent btn-sm" id="menuCalcCellDoneBtn">Selesai</button>
+        </div>
+      </div>
+    </div>
 
     <!-- ============ PO VIEW ============ -->
     <section class="view" id="view-po">
@@ -1176,10 +1186,22 @@ async function loadPM(){
   if(canEdit) populateMenuCalcPmSelect(list);
 }
 
-/* ---------------- KALKULATOR SUSUNAN BAHAN BAKU (sub-fitur PM) ---------------- */
-const MENU_CALC_GROUP_ORDER = ['Karbo','Protein Nabati','Protein Hewani','Sayur','Buah','Bumbu'];
+/* ---------------- KALKULATOR MATRIKS MENU (sub-fitur PM) ---------------- */
+const MENU_CALC_GROUP_ORDER = ['Karbo','Protein Hewani','Protein Nabati','Sayur','Buah','Susu','Bumbu'];
+const MENU_CALC_DAYS = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 let menuCalcItemsCache = [];
-let menuCalcSelectedIds = new Set(); // pakai nama item (lowercase) sebagai id, supaya tetap konsisten walau daftar di-render ulang
+let menuCalcPorsiPerDay = {};
+// Pilihan per sel: menuCalcSelections[group][day] = Set nama item (lowercase)
+let menuCalcSelections = {};
+
+function resetMenuCalcSelections(){
+  menuCalcSelections = {};
+  MENU_CALC_GROUP_ORDER.forEach(g => {
+    menuCalcSelections[g] = {};
+    MENU_CALC_DAYS.forEach(d => { menuCalcSelections[g][d] = new Set(); });
+  });
+}
+resetMenuCalcSelections();
 
 function populateMenuCalcPmSelect(list){
   const sel = document.getElementById('menuCalcPmSelect');
@@ -1196,86 +1218,208 @@ function populateMenuCalcPmSelect(list){
     if(defaultPm) sel.value = defaultPm['ID PM'];
   }
   if(sel.value) loadMenuCalcData(sel.value);
-  else { document.getElementById('menuCalcGroups').innerHTML = ''; document.getElementById('menuCalcTotalWrap').style.display = 'none'; }
+  else document.getElementById('menuCalcMatrix').style.display = 'none';
 }
 
 document.getElementById('menuCalcPmSelect').addEventListener('change', () => {
-  menuCalcSelectedIds = new Set(); // ganti PM -> mulai ulang pilihan
+  resetMenuCalcSelections(); // ganti PM -> mulai ulang pilihan (porsi per hari beda PM lain)
   const pmId = document.getElementById('menuCalcPmSelect').value;
   if(pmId) loadMenuCalcData(pmId);
-  else { document.getElementById('menuCalcGroups').innerHTML = ''; document.getElementById('menuCalcTotalWrap').style.display = 'none'; }
+  else document.getElementById('menuCalcMatrix').style.display = 'none';
 });
 
 async function loadMenuCalcData(pmId){
-  const groupsWrap = document.getElementById('menuCalcGroups');
-  groupsWrap.innerHTML = '<p class="helptext">Memuat...</p>';
+  const matrix = document.getElementById('menuCalcMatrix');
   let result;
   try{ result = await api('getMenuCalcData', { pmId }); }
-  catch(e){ toast(e.message, true); groupsWrap.innerHTML = ''; return; }
+  catch(e){ toast(e.message, true); matrix.style.display = 'none'; return; }
 
   menuCalcItemsCache = result.items || [];
-  renderMenuCalcGroups();
+  menuCalcPorsiPerDay = result.porsiPerDay || {};
+  renderMenuCalcMatrix();
 }
 
-function renderMenuCalcGroups(){
-  const groupsWrap = document.getElementById('menuCalcGroups');
-  groupsWrap.innerHTML = '';
+/** Kelompokkan item bahan baku per Group (dipakai isi popup pilih item per sel). */
+function menuCalcItemsInGroup(group){
+  return menuCalcItemsCache
+    .filter(it => it.Group === group)
+    .sort((a,b) => a.Item.localeCompare(b.Item, 'id', {sensitivity:'base'}));
+}
 
-  const byGroup = {};
-  menuCalcItemsCache.forEach(it => {
-    const g = MENU_CALC_GROUP_ORDER.includes(it.Group) ? it.Group : 'Lainnya';
-    if(!byGroup[g]) byGroup[g] = [];
-    byGroup[g].push(it);
+const MENU_CALC_BUMBU_AVG_KEY = '__avg__'; // penanda khusus "pakai bumbu (harga rata-rata)" untuk 1 hari
+let menuCalcBumbuMode = 'rata-rata'; // 'rata-rata' (1 harga gabungan) atau 'per-item' (pilih satu-satu)
+
+/** Harga rata-rata semua item Bumbu (dari Item Master, Unit Price referensi tertinggi). */
+function menuCalcBumbuAvgPrice(){
+  const items = menuCalcItemsInGroup('Bumbu');
+  if(!items.length) return 0;
+  return items.reduce((s, it) => s + it.unitPrice, 0) / items.length;
+}
+
+/** Biaya 1 sel (Group x Hari) = jumlah Unit Price item yang dipilih di sel itu x porsi hari itu. */
+function menuCalcCellCost(group, day){
+  const porsi = menuCalcPorsiPerDay[day] || 0;
+  if(group === 'Bumbu' && menuCalcBumbuMode === 'rata-rata'){
+    if(!menuCalcSelections[group][day].has(MENU_CALC_BUMBU_AVG_KEY)) return 0;
+    return menuCalcBumbuAvgPrice() * porsi;
+  }
+  const selected = menuCalcSelections[group][day];
+  if(!selected || !selected.size) return 0;
+  const sumUnitPrice = menuCalcItemsInGroup(group)
+    .filter(it => selected.has(it.Item.toLowerCase()))
+    .reduce((s, it) => s + it.unitPrice, 0);
+  return sumUnitPrice * porsi;
+}
+
+function renderMenuCalcMatrix(){
+  const matrix = document.getElementById('menuCalcMatrix');
+  const head = document.getElementById('menuCalcMatrixHead');
+  const body = document.getElementById('menuCalcMatrixBody');
+  const foot = document.getElementById('menuCalcMatrixFoot');
+
+  head.innerHTML = '<th>Group</th>' + MENU_CALC_DAYS.map(d => `<th>${d}</th>`).join('') + '<th class="right">Total Harga</th>';
+
+  body.innerHTML = '';
+  MENU_CALC_GROUP_ORDER.forEach(group => {
+    const tr = document.createElement('tr');
+    const isBumbuAvg = group === 'Bumbu' && menuCalcBumbuMode === 'rata-rata';
+    const groupLabel = group === 'Bumbu'
+      ? `<b>Bumbu</b><div class="row" style="gap:4px; margin-top:4px;">
+           <button type="button" class="btn btn-sm menu-calc-bumbu-mode-btn ${menuCalcBumbuMode==='rata-rata'?'btn-accent':'btn-ghost'}" data-mode="rata-rata" style="font-size:11px; padding:3px 8px;">Rata-rata</button>
+           <button type="button" class="btn btn-sm menu-calc-bumbu-mode-btn ${menuCalcBumbuMode==='per-item'?'btn-accent':'btn-ghost'}" data-mode="per-item" style="font-size:11px; padding:3px 8px;">Per Item</button>
+         </div>`
+      : `<b>${group}</b>`;
+    let rowHtml = `<td data-label="Group">${groupLabel}</td>`;
+    MENU_CALC_DAYS.forEach(day => {
+      if(isBumbuAvg){
+        rowHtml += `<td data-label="${day}"><button type="button" class="btn btn-ghost btn-sm menu-calc-bumbu-toggle-btn" data-day="${day}" style="width:100%;"></button></td>`;
+      } else {
+        rowHtml += `<td data-label="${day}"><button type="button" class="btn btn-ghost btn-sm menu-calc-cell-btn" data-group="${group}" data-day="${day}" style="width:100%; text-align:left; white-space:normal;"></button></td>`;
+      }
+    });
+    rowHtml += `<td data-label="Total Harga" class="right num menu-calc-row-total" data-group="${group}"></td>`;
+    tr.innerHTML = rowHtml;
+    body.appendChild(tr);
   });
 
-  const orderedGroups = MENU_CALC_GROUP_ORDER.filter(g => byGroup[g] && byGroup[g].length);
-  if(byGroup['Lainnya']) orderedGroups.push('Lainnya');
+  body.querySelectorAll('.menu-calc-cell-btn').forEach(btn => {
+    btn.addEventListener('click', () => openMenuCalcCellPicker(btn.dataset.group, btn.dataset.day));
+  });
 
-  if(!orderedGroups.length){
-    groupsWrap.innerHTML = '<p class="helptext">Belum ada item bahan baku di Item Master.</p>';
-    updateMenuCalcTotal();
-    return;
-  }
+  body.querySelectorAll('.menu-calc-bumbu-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const day = btn.dataset.day;
+      const set = menuCalcSelections['Bumbu'][day];
+      if(set.has(MENU_CALC_BUMBU_AVG_KEY)) set.delete(MENU_CALC_BUMBU_AVG_KEY);
+      else set.add(MENU_CALC_BUMBU_AVG_KEY);
+      refreshMenuCalcDisplay();
+    });
+  });
 
-  orderedGroups.forEach(group => {
-    const items = byGroup[group].sort((a,b) => a.Item.localeCompare(b.Item, 'id', {sensitivity:'base'}));
-    const groupDiv = document.createElement('div');
-    groupDiv.style.marginBottom = '16px';
-    groupDiv.innerHTML = `<div class="helptext" style="font-weight:600; margin-bottom:6px;">${group}</div>`;
-    items.forEach(it => {
+  body.querySelectorAll('.menu-calc-bumbu-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if(btn.dataset.mode === menuCalcBumbuMode) return;
+      menuCalcBumbuMode = btn.dataset.mode;
+      menuCalcSelections['Bumbu'] = {}; // ganti mode -> kosongkan pilihan Bumbu (struktur datanya beda), group lain tidak kesentuh
+      MENU_CALC_DAYS.forEach(d => { menuCalcSelections['Bumbu'][d] = new Set(); });
+      renderMenuCalcMatrix();
+    });
+  });
+
+  foot.innerHTML = '<td><b>Total Harga</b></td>' +
+    MENU_CALC_DAYS.map(d => `<td class="right num menu-calc-day-total" data-day="${d}"></td>`).join('') +
+    '<td class="right num" id="menuCalcGrandTotal"><b></b></td>';
+
+  matrix.style.display = 'table';
+  refreshMenuCalcDisplay();
+}
+
+/** Update teks tiap sel, total per baris (Group), total per kolom (Hari), dan grand total -- tanpa render ulang seluruh tabel. */
+function refreshMenuCalcDisplay(){
+  let grandTotal = 0;
+
+  document.querySelectorAll('.menu-calc-cell-btn').forEach(btn => {
+    const group = btn.dataset.group, day = btn.dataset.day;
+    const selected = Array.from(menuCalcSelections[group][day]);
+    const items = menuCalcItemsInGroup(group);
+    const names = selected.map(id => { const it = items.find(x => x.Item.toLowerCase() === id); return it ? it.Item : id; });
+    btn.textContent = names.length ? names.join(', ') : 'Pilih...';
+    btn.className = 'btn btn-ghost btn-sm menu-calc-cell-btn' + (names.length ? '' : ' tap-value-empty');
+  });
+
+  document.querySelectorAll('.menu-calc-bumbu-toggle-btn').forEach(btn => {
+    const day = btn.dataset.day;
+    const active = menuCalcSelections['Bumbu'][day].has(MENU_CALC_BUMBU_AVG_KEY);
+    btn.textContent = active ? '✓ Pakai Bumbu' : 'Pakai Bumbu';
+    btn.className = 'btn btn-sm menu-calc-bumbu-toggle-btn ' + (active ? 'btn-accent' : 'btn-ghost');
+  });
+
+  MENU_CALC_GROUP_ORDER.forEach(group => {
+    const rowTotal = MENU_CALC_DAYS.reduce((s, day) => s + menuCalcCellCost(group, day), 0);
+    const cell = document.querySelector(`.menu-calc-row-total[data-group="${group}"]`);
+    if(cell) cell.textContent = fmtRupiah(rowTotal);
+  });
+
+  MENU_CALC_DAYS.forEach(day => {
+    const dayTotal = MENU_CALC_GROUP_ORDER.reduce((s, group) => s + menuCalcCellCost(group, day), 0);
+    grandTotal += dayTotal;
+    const cell = document.querySelector(`.menu-calc-day-total[data-day="${day}"]`);
+    if(cell) cell.textContent = fmtRupiah(dayTotal);
+  });
+
+  const grandCell = document.getElementById('menuCalcGrandTotal');
+  if(grandCell) grandCell.innerHTML = `<b>${fmtRupiah(grandTotal)}</b>`;
+}
+
+/* ---- Popup pilih item (multi-centang) untuk 1 sel Group x Hari ---- */
+let menuCalcCellPickerCtx = null; // { group, day, tempSelected: Set }
+
+function openMenuCalcCellPicker(group, day){
+  const items = menuCalcItemsInGroup(group);
+  menuCalcCellPickerCtx = { group, day, tempSelected: new Set(menuCalcSelections[group][day]) };
+
+  document.getElementById('menuCalcCellTitle').textContent = `${group} — ${day}`;
+  const listWrap = document.getElementById('menuCalcCellItemList');
+  if(!items.length){
+    listWrap.innerHTML = '<p class="helptext">Belum ada item bahan baku di Group ini.</p>';
+  } else {
+    listWrap.innerHTML = items.map(it => {
       const id = it.Item.toLowerCase();
-      const row = document.createElement('div');
-      row.className = 'wa-item-row';
-      row.innerHTML = `
-        <div class="wa-check ${menuCalcSelectedIds.has(id)?'selected':''}"></div>
+      const checked = menuCalcCellPickerCtx.tempSelected.has(id);
+      return `<div class="wa-item-row" data-id="${id}">
+        <div class="wa-check ${checked?'selected':''}"></div>
         <div class="wa-item-info">
           <div class="nm">${it.Item}</div>
-          <div class="meta">≈ ${fmtRupiah(it.avgHargaPerPorsi)}/porsi · proyeksi ${fmtRupiah(it.projectedCost)}</div>
+          <div class="meta">${fmtRupiah(it.unitPrice)} / ${it.Satuan||'-'}</div>
         </div>
-      `;
+      </div>`;
+    }).join('');
+    listWrap.querySelectorAll('.wa-item-row').forEach(row => {
+      const id = row.dataset.id;
       const checkEl = row.querySelector('.wa-check');
-      checkEl.addEventListener('click', () => {
-        if(menuCalcSelectedIds.has(id)){ menuCalcSelectedIds.delete(id); checkEl.classList.remove('selected'); }
-        else { menuCalcSelectedIds.add(id); checkEl.classList.add('selected'); }
-        updateMenuCalcTotal();
+      row.addEventListener('click', () => {
+        if(menuCalcCellPickerCtx.tempSelected.has(id)){ menuCalcCellPickerCtx.tempSelected.delete(id); checkEl.classList.remove('selected'); }
+        else { menuCalcCellPickerCtx.tempSelected.add(id); checkEl.classList.add('selected'); }
       });
-      groupDiv.appendChild(row);
     });
-    groupsWrap.appendChild(groupDiv);
-  });
-
-  updateMenuCalcTotal();
+  }
+  document.getElementById('menuCalcCellOverlay').classList.add('show');
 }
 
-function updateMenuCalcTotal(){
-  const totalWrap = document.getElementById('menuCalcTotalWrap');
-  if(!menuCalcSelectedIds.size){ totalWrap.style.display = 'none'; return; }
-  const total = menuCalcItemsCache
-    .filter(it => menuCalcSelectedIds.has(it.Item.toLowerCase()))
-    .reduce((s, it) => s + it.projectedCost, 0);
-  document.getElementById('menuCalcTotal').textContent = fmtRupiah(total);
-  totalWrap.style.display = 'block';
-}
+document.getElementById('menuCalcCellCancelBtn').addEventListener('click', () => {
+  document.getElementById('menuCalcCellOverlay').classList.remove('show');
+  menuCalcCellPickerCtx = null;
+});
+
+document.getElementById('menuCalcCellDoneBtn').addEventListener('click', () => {
+  if(menuCalcCellPickerCtx){
+    const { group, day, tempSelected } = menuCalcCellPickerCtx;
+    menuCalcSelections[group][day] = tempSelected;
+    refreshMenuCalcDisplay();
+  }
+  document.getElementById('menuCalcCellOverlay').classList.remove('show');
+  menuCalcCellPickerCtx = null;
+});
 
 /** Isi form dari baris PM yang dipilih lewat tombol Edit -- langsung masuk mode edit tanpa perlu pilih tanggal manual. */
 function startEditPm(pm){
