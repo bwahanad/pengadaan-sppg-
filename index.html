@@ -1206,9 +1206,9 @@ resetMenuCalcSelections();
 function populateMenuCalcPmSelect(list){
   const sel = document.getElementById('menuCalcPmSelect');
   const prevValue = sel.value;
-  // Kalkulator ini untuk RENCANA ke depan -- PM yang periodenya sudah lewat (Sampai < hari ini) tidak ditampilkan.
+  // Kalkulator ini untuk RENCANA ke depan, dan cuma untuk PM yang masih bisa diedit (belum read-only/terkunci).
   const todayStr = isoDate(new Date());
-  const upcoming = list.filter(pm => isoDate(pm['Sampai']) >= todayStr);
+  const upcoming = list.filter(pm => isoDate(pm['Sampai']) >= todayStr && !pm['ReadOnly']);
   sel.innerHTML = '<option value="">Pilih PM</option>' +
     upcoming.map(pm => `<option value="${pm['ID PM']}">${pm['ID PM']} · ${fmtDate(pm['Mulai'])} – ${fmtDate(pm['Sampai'])}</option>`).join('');
   if(prevValue && upcoming.some(pm => pm['ID PM'] === prevValue)){
