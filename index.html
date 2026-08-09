@@ -443,7 +443,7 @@
               <option value="operasional">Operasional</option>
             </select>
           </div>
-          <div class="field" style="display:none;"><label>Porsi per Unit</label><input type="number" id="itemPorsi" value="0"></div>
+          <div class="field"><label>Qty per Unit</label><input type="number" id="itemQtyPerUnit" placeholder="mis. 10" step="any"></div>
         </div>
         <div style="margin-top:14px;">
           <button class="btn btn-primary" id="saveItemBtn">Simpan Item</button>
@@ -1771,11 +1771,12 @@ function renderPOTable(list){
   const head = document.getElementById('poTableHead');
   head.innerHTML = `<th>Item</th><th class="right">Qty</th><th>Satuan</th>
     <th class="right">Harga Satuan</th><th class="right">Jumlah</th>
+    <th class="right">Qty per Unit</th>
     ${canSeeModal ? '<th class="right">Modal/Unit</th><th class="right">Total Modal</th>' : ''}
     ${canDeleteAny ? '<th></th>' : ''}`;
 
   const tb = document.getElementById('poTableBody'); tb.innerHTML = '';
-  const colCount = 5 + (canSeeModal?2:0) + (canDeleteAny?1:0);
+  const colCount = 6 + (canSeeModal?2:0) + (canDeleteAny?1:0);
   if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Belum ada PO</td></tr>`; return; }
 
   list.sort((a,b) => new Date(b['Tanggal']) - new Date(a['Tanggal']));
@@ -1822,12 +1823,15 @@ function renderPOTable(list){
       const deleteCell = canDeleteAny
         ? `<td data-label="">${canDeleteThis ? `<button class="btn btn-ghost btn-sm delete-po-btn" data-id="${po['ID']}" title="Hapus">✕</button>` : ''}</td>`
         : '';
+      const masterItem = itemMasterCache.find(it => String(it['Item']||'').trim().toLowerCase() === String(po['Item']||'').trim().toLowerCase());
+      const qtyPerUnitVal = masterItem ? Number(masterItem['Qty per Unit']) || 0 : 0;
       tr.innerHTML = `
         <td data-label="Item" title="${po['Item']} — ${po['Status']}"><span class="status-dot ${statusDotClass}"></span><span class="po-item-name">${po['Item']}</span></td>
         <td data-label="Qty" class="right num">${qtyCell}</td>
         <td data-label="Satuan">${po['Unit']}</td>
         <td data-label="Harga Satuan" class="right">${priceCell}</td>
         <td data-label="Jumlah" class="right num">${po['Total Belanja'] ? fmtRupiah(po['Total Belanja']) : '-'}</td>
+        <td data-label="Qty per Unit" class="right num">${qtyPerUnitVal || '-'}</td>
         ${modalCells}
         ${deleteCell}
       `;
@@ -2081,11 +2085,13 @@ function renderItemMasterRows(list){
   const head = document.getElementById('itemTableHead');
   head.innerHTML = `<th>Item</th><th>Satuan</th><th>Group</th><th>Kategori</th>
     <th class="right">Unit Price</th>
+    <th class="right">Qty per Unit</th>
+    <th class="right">Harga per Porsi</th>
     ${canSeeModalRef ? '<th class="right">Modal Per Unit <span style="font-weight:400; text-transform:none;">(ref.)</span></th>' : ''}
     ${(canManageDescriptive||canDelete) ? '<th></th>' : ''}`;
 
   const tb = document.getElementById('itemTableBody'); tb.innerHTML = '';
-  const colCount = 5 + (canSeeModalRef?1:0) + ((canManageDescriptive||canDelete)?1:0);
+  const colCount = 7 + (canSeeModalRef?1:0) + ((canManageDescriptive||canDelete)?1:0);
   if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Tidak ada item yang cocok</td></tr>`; return; }
   list.forEach(it => {
     const tr = document.createElement('tr');
@@ -2094,6 +2100,11 @@ function renderItemMasterRows(list){
     const modalCell = `<td data-label="Unit Price" class="right">${canEditThisPrice
       ? `<input class="price-input mono item-modal-input" type="number" value="${it['Unit Price']||''}" placeholder="isi" data-id="${it['ID']}" data-nama="${it['Item']}">`
       : `<span class="num">${it['Unit Price'] ? fmtRupiah(it['Unit Price']) : '-'}</span>`}</td>`;
+    const qtyPerUnit = Number(it['Qty per Unit']) || 0;
+    const unitPrice = Number(it['Unit Price']) || 0;
+    const hargaPerPorsi = qtyPerUnit > 0 ? unitPrice / qtyPerUnit : 0;
+    const qtyPerUnitCell = `<td data-label="Qty per Unit" class="right num">${qtyPerUnit || '-'}</td>`;
+    const hargaPerPorsiCell = `<td data-label="Harga per Porsi" class="right num">${hargaPerPorsi ? fmtRupiah(hargaPerPorsi) : '-'}</td>`;
     const modalRefCell = canSeeModalRef
       ? `<td data-label="Modal Per Unit" class="right num">${it['Modal Per Unit'] ? fmtRupiah(it['Modal Per Unit']) : '-'}</td>` : '';
     const actionCell = (canManageDescriptive||canDelete) ? `<td data-label="">
@@ -2106,6 +2117,8 @@ function renderItemMasterRows(list){
       <td data-label="Group">${it['Group']||'-'}</td>
       <td data-label="Kategori">${it['Kategori']||'-'}</td>
       ${modalCell}
+      ${qtyPerUnitCell}
+      ${hargaPerPorsiCell}
       ${modalRefCell}
       ${actionCell}
     `;
@@ -2136,7 +2149,7 @@ function renderItemMasterRows(list){
         document.getElementById('itemSatuan').value = it['satuan'] || '';
         setItemGroupValue(it['Group'] || '');
         document.getElementById('itemKategori').value = it['Kategori'] || 'bahan baku';
-        document.getElementById('itemPorsi').value = it['porsi per unit'] || '';
+        document.getElementById('itemQtyPerUnit').value = it['Qty per Unit'] || '';
         document.getElementById('itemFormCard').scrollIntoView({behavior:'smooth'});
       });
     });
@@ -2171,7 +2184,7 @@ function clearItemForm(){
   document.getElementById('itemSatuan').value = '';
   document.getElementById('itemGroup').value = '';
   document.getElementById('itemKategori').value = (state.role === 'ops_maker') ? 'operasional' : 'bahan baku';
-  document.getElementById('itemPorsi').value = '';
+  document.getElementById('itemQtyPerUnit').value = '';
 }
 document.getElementById('clearItemBtn').addEventListener('click', clearItemForm);
 
@@ -2180,14 +2193,14 @@ document.getElementById('saveItemBtn').addEventListener('click', async () => {
   const satuan = document.getElementById('itemSatuan').value.trim();
   const group = document.getElementById('itemGroup').value.trim();
   const kategori = document.getElementById('itemKategori').value.trim();
-  const porsiRaw = document.getElementById('itemPorsi').value;
+  const qtyPerUnitRaw = document.getElementById('itemQtyPerUnit').value;
 
   const missing = [];
   if(!nama) missing.push('Nama Item');
   if(!satuan) missing.push('Satuan');
   if(!group) missing.push('Group');
   if(!kategori) missing.push('Kategori');
-  // Porsi per Unit dinonaktifkan dari UI -- tidak lagi wajib diisi
+  // Qty per Unit opsional -- tidak wajib diisi
   if(missing.length){
     await showAlert('Kolom berikut belum diisi:\n' + missing.join(', '));
     return;
@@ -2198,7 +2211,7 @@ document.getElementById('saveItemBtn').addEventListener('click', async () => {
     satuan: satuan,
     Group: group,
     Kategori: kategori,
-    'porsi per unit': Number(porsiRaw) || 0
+    'Qty per Unit': Number(qtyPerUnitRaw) || 0
   };
   try{
     await api('saveItem', { data });
