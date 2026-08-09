@@ -335,6 +335,24 @@
           <tbody id="pmTableBody"></tbody>
         </table></div>
       </div>
+
+      <div class="card" id="menuCalcCard" style="display:none;">
+        <div class="card-head">
+          <h2>Kalkulator Susunan Bahan Baku</h2>
+        </div>
+        <p class="helptext" style="margin:-6px 0 12px;">Centang bahan yang mau dipakai di tiap kelompok, sistem hitung proyeksi biayanya otomatis berdasarkan rata-rata harga per porsi dari histori PO.</p>
+        <div class="field" style="max-width:320px; margin-bottom:14px;">
+          <label>PM</label>
+          <select id="menuCalcPmSelect"></select>
+        </div>
+        <div id="menuCalcTotalWrap" style="display:none; margin-bottom:14px;">
+          <div class="summary-item">
+            <div class="label">Total Proyeksi Biaya (item terpilih)</div>
+            <div class="value" id="menuCalcTotal">Rp0</div>
+          </div>
+        </div>
+        <div id="menuCalcGroups"></div>
+      </div>
     </section>
 
     <!-- ============ PO VIEW ============ -->
@@ -1152,6 +1170,111 @@ async function loadPM(){
     tb.appendChild(tr);
   });
   loadPmDropdownForPO(list);
+
+  // Kalkulator Susunan Bahan Baku -- sub-fitur PM, khusus role yang kelola PM (Admin/Keuangan)
+  document.getElementById('menuCalcCard').style.display = canEdit ? 'block' : 'none';
+  if(canEdit) populateMenuCalcPmSelect(list);
+}
+
+/* ---------------- KALKULATOR SUSUNAN BAHAN BAKU (sub-fitur PM) ---------------- */
+const MENU_CALC_GROUP_ORDER = ['Karbo','Protein Nabati','Protein Hewani','Sayur','Buah','Bumbu'];
+let menuCalcItemsCache = [];
+let menuCalcSelectedIds = new Set(); // pakai nama item (lowercase) sebagai id, supaya tetap konsisten walau daftar di-render ulang
+
+function populateMenuCalcPmSelect(list){
+  const sel = document.getElementById('menuCalcPmSelect');
+  const prevValue = sel.value;
+  // Kalkulator ini untuk RENCANA ke depan -- PM yang periodenya sudah lewat (Sampai < hari ini) tidak ditampilkan.
+  const todayStr = isoDate(new Date());
+  const upcoming = list.filter(pm => isoDate(pm['Sampai']) >= todayStr);
+  sel.innerHTML = '<option value="">Pilih PM</option>' +
+    upcoming.map(pm => `<option value="${pm['ID PM']}">${pm['ID PM']} · ${fmtDate(pm['Mulai'])} – ${fmtDate(pm['Sampai'])}</option>`).join('');
+  if(prevValue && upcoming.some(pm => pm['ID PM'] === prevValue)){
+    sel.value = prevValue;
+  } else {
+    const defaultPm = upcoming.find(pm => todayStr >= isoDate(pm['Mulai']) && todayStr <= isoDate(pm['Sampai']));
+    if(defaultPm) sel.value = defaultPm['ID PM'];
+  }
+  if(sel.value) loadMenuCalcData(sel.value);
+  else { document.getElementById('menuCalcGroups').innerHTML = ''; document.getElementById('menuCalcTotalWrap').style.display = 'none'; }
+}
+
+document.getElementById('menuCalcPmSelect').addEventListener('change', () => {
+  menuCalcSelectedIds = new Set(); // ganti PM -> mulai ulang pilihan
+  const pmId = document.getElementById('menuCalcPmSelect').value;
+  if(pmId) loadMenuCalcData(pmId);
+  else { document.getElementById('menuCalcGroups').innerHTML = ''; document.getElementById('menuCalcTotalWrap').style.display = 'none'; }
+});
+
+async function loadMenuCalcData(pmId){
+  const groupsWrap = document.getElementById('menuCalcGroups');
+  groupsWrap.innerHTML = '<p class="helptext">Memuat...</p>';
+  let result;
+  try{ result = await api('getMenuCalcData', { pmId }); }
+  catch(e){ toast(e.message, true); groupsWrap.innerHTML = ''; return; }
+
+  menuCalcItemsCache = result.items || [];
+  renderMenuCalcGroups();
+}
+
+function renderMenuCalcGroups(){
+  const groupsWrap = document.getElementById('menuCalcGroups');
+  groupsWrap.innerHTML = '';
+
+  const byGroup = {};
+  menuCalcItemsCache.forEach(it => {
+    const g = MENU_CALC_GROUP_ORDER.includes(it.Group) ? it.Group : 'Lainnya';
+    if(!byGroup[g]) byGroup[g] = [];
+    byGroup[g].push(it);
+  });
+
+  const orderedGroups = MENU_CALC_GROUP_ORDER.filter(g => byGroup[g] && byGroup[g].length);
+  if(byGroup['Lainnya']) orderedGroups.push('Lainnya');
+
+  if(!orderedGroups.length){
+    groupsWrap.innerHTML = '<p class="helptext">Belum ada item bahan baku di Item Master.</p>';
+    updateMenuCalcTotal();
+    return;
+  }
+
+  orderedGroups.forEach(group => {
+    const items = byGroup[group].sort((a,b) => a.Item.localeCompare(b.Item, 'id', {sensitivity:'base'}));
+    const groupDiv = document.createElement('div');
+    groupDiv.style.marginBottom = '16px';
+    groupDiv.innerHTML = `<div class="helptext" style="font-weight:600; margin-bottom:6px;">${group}</div>`;
+    items.forEach(it => {
+      const id = it.Item.toLowerCase();
+      const row = document.createElement('div');
+      row.className = 'wa-item-row';
+      row.innerHTML = `
+        <div class="wa-check ${menuCalcSelectedIds.has(id)?'selected':''}"></div>
+        <div class="wa-item-info">
+          <div class="nm">${it.Item}</div>
+          <div class="meta">≈ ${fmtRupiah(it.avgHargaPerPorsi)}/porsi · proyeksi ${fmtRupiah(it.projectedCost)}</div>
+        </div>
+      `;
+      const checkEl = row.querySelector('.wa-check');
+      checkEl.addEventListener('click', () => {
+        if(menuCalcSelectedIds.has(id)){ menuCalcSelectedIds.delete(id); checkEl.classList.remove('selected'); }
+        else { menuCalcSelectedIds.add(id); checkEl.classList.add('selected'); }
+        updateMenuCalcTotal();
+      });
+      groupDiv.appendChild(row);
+    });
+    groupsWrap.appendChild(groupDiv);
+  });
+
+  updateMenuCalcTotal();
+}
+
+function updateMenuCalcTotal(){
+  const totalWrap = document.getElementById('menuCalcTotalWrap');
+  if(!menuCalcSelectedIds.size){ totalWrap.style.display = 'none'; return; }
+  const total = menuCalcItemsCache
+    .filter(it => menuCalcSelectedIds.has(it.Item.toLowerCase()))
+    .reduce((s, it) => s + it.projectedCost, 0);
+  document.getElementById('menuCalcTotal').textContent = fmtRupiah(total);
+  totalWrap.style.display = 'block';
 }
 
 /** Isi form dari baris PM yang dipilih lewat tombol Edit -- langsung masuk mode edit tanpa perlu pilih tanggal manual. */
