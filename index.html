@@ -1159,11 +1159,15 @@ async function loadPM(){
       ${aksiCell}
     `;
     if(canEdit && !isReadOnly){
-      tr.querySelector('.edit-pm-btn').addEventListener('click', () => startEditPm(pm));
+      tr.style.cursor = 'pointer';
+      tr.title = 'Tap untuk pilih PM ini di Kalkulator Matriks Menu';
+      tr.addEventListener('click', () => selectPmForMenuCalc(pm['ID PM']));
+      tr.querySelector('.edit-pm-btn').addEventListener('click', (e) => { e.stopPropagation(); startEditPm(pm); });
     }
     const lockBtn = tr.querySelector('.toggle-pm-lock-btn');
     if(lockBtn){
-      lockBtn.addEventListener('click', async () => {
+      lockBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
         const willUnlock = lockBtn.dataset.unlock === 'true';
         const confirmMsg = willUnlock
           ? `Buka kunci PM ${pm['ID PM']}? Keuangan akan bisa edit/hapus PM ini lagi walau sudah lebih dari 10 hari.`
@@ -1202,6 +1206,19 @@ function resetMenuCalcSelections(){
   });
 }
 resetMenuCalcSelections();
+
+/** Dipanggil saat baris PM (yang masih bisa diedit) di Daftar PM di-tap -- langsung pilihkan PM itu di Kalkulator Matriks Menu. */
+function selectPmForMenuCalc(pmId){
+  const sel = document.getElementById('menuCalcPmSelect');
+  if(!Array.from(sel.options).some(o => o.value === pmId)){
+    toast('PM ini tidak tersedia di Kalkulator (sudah lewat tanggal atau terkunci)', true);
+    return;
+  }
+  sel.value = pmId;
+  resetMenuCalcSelections(); // ganti PM -> mulai ulang pilihan
+  loadMenuCalcData(pmId);
+  document.getElementById('menuCalcCard').scrollIntoView({ behavior:'smooth', block:'start' });
+}
 
 function populateMenuCalcPmSelect(list){
   const sel = document.getElementById('menuCalcPmSelect');
