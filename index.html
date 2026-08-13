@@ -356,6 +356,10 @@
           <tbody id="menuCalcMatrixBody"></tbody>
           <tfoot><tr id="menuCalcMatrixFoot"></tr></tfoot>
         </table></div>
+        <div id="menuCalcTransferWrap" style="display:none; margin-top:14px;">
+          <button class="btn btn-accent" id="menuCalcTransferBtn" style="width:100%; justify-content:center;" disabled>Transfer Data ke PO</button>
+          <p class="helptext" id="menuCalcTransferHint" style="margin-top:6px;"></p>
+        </div>
       </div>
     </section>
 
@@ -1032,7 +1036,7 @@ async function boot(){
 
 const TAB_DEFS = [
   { id:'approval', label:'Persetujuan SPPG', roles:['superadmin'] },
-  { id:'pm', label:'PM', roles:['admin','keuangan','ahli_gizi'] },
+  { id:'pm', label:'PM', roles:['admin','keuangan','ahli_gizi','dapur','suplier'] },
   { id:'po', label:'PO', roles:['admin','keuangan','suplier','dapur','investor','do_maker','ops_maker'] },
   { id:'item', label:'Item Master', roles:['admin','keuangan','ops_maker','suplier','ahli_gizi'] },
   { id:'laporan', label:'Laporan', roles:['admin','suplier','investor'] },
@@ -1130,7 +1134,7 @@ let editingPmId = null; // ID PM yang sedang diedit (kalau tanggal yang dipilih 
 
 async function loadPM(){
   const canEdit = ['admin','keuangan'].includes(state.role);
-  const canUseMenuCalc = ['admin','keuangan','ahli_gizi'].includes(state.role);
+  const canUseMenuCalc = ['admin','keuangan','ahli_gizi','dapur','suplier'].includes(state.role);
   const isAdmin = state.role === 'admin';
   const isAhliGizi = state.role === 'ahli_gizi';
   document.getElementById('pmFormCard').style.display = canEdit ? 'block' : 'none';
@@ -1211,6 +1215,41 @@ let menuCalcPorsiPerDay = {};
 // Pilihan per sel: menuCalcSelections[group][day] = Set nama item (lowercase)
 let menuCalcSelections = {};
 
+/** Ubah pilihan saat ini jadi teks JSON, dipakai untuk disimpan ke server (auto-fill SPPG+PM berikutnya). */
+function serializeMenuCalcState(){
+  const selectionsObj = {};
+  MENU_CALC_GROUP_ORDER.forEach(g => {
+    selectionsObj[g] = {};
+    MENU_CALC_DAYS.forEach(d => { selectionsObj[g][d] = Array.from(menuCalcSelections[g][d]); });
+  });
+  return JSON.stringify({ bumbuMode: menuCalcBumbuMode, selections: selectionsObj });
+}
+
+/** Terapkan pilihan yang sudah pernah tersimpan (hasil serializeMenuCalcState). Balikin true kalau berhasil dipakai. */
+function deserializeMenuCalcState(savedState){
+  if(!savedState || !savedState.selections) return false;
+  try{
+    menuCalcBumbuMode = savedState.bumbuMode === 'per-item' ? 'per-item' : 'rata-rata';
+    MENU_CALC_GROUP_ORDER.forEach(g => {
+      menuCalcSelections[g] = {};
+      MENU_CALC_DAYS.forEach(d => {
+        const arr = (savedState.selections[g] && savedState.selections[g][d]) || [];
+        menuCalcSelections[g][d] = new Set(arr);
+      });
+    });
+    return true;
+  } catch(e){ return false; }
+}
+
+let menuCalcCurrentPmId = null; // PM yang sedang aktif di kalkulator, dipakai simpan pilihan ke SPPG+PM yang tepat
+
+/** Simpan pilihan saat ini ke server (latar belakang, tidak mengganggu pengguna kalau gagal). */
+async function saveMenuCalcStateToServer(){
+  if(!menuCalcCurrentPmId) return;
+  try{ await api('saveMenuCalcState', { pmId: menuCalcCurrentPmId, stateJson: serializeMenuCalcState() }); }
+  catch(e){ /* diamkan -- penyimpanan latar belakang, tidak perlu ganggu pengguna kalau sesekali gagal */ }
+}
+
 function resetMenuCalcSelections(){
   menuCalcSelections = {};
   MENU_CALC_GROUP_ORDER.forEach(g => {
@@ -1228,9 +1267,8 @@ function selectPmForMenuCalc(pmId){
     return;
   }
   sel.value = pmId;
-  resetMenuCalcSelections(); // ganti PM -> mulai ulang pilihan
   updateMenuCalcPmValueDisplay();
-  loadMenuCalcData(pmId);
+  loadMenuCalcData(pmId); // resetMenuCalcSelections/muat pilihan tersimpan ditangani di dalam loadMenuCalcData
   document.getElementById('menuCalcCard').scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
@@ -1264,10 +1302,9 @@ function updateMenuCalcPmValueDisplay(){
 }
 
 document.getElementById('menuCalcPmSelect').addEventListener('change', () => {
-  resetMenuCalcSelections(); // ganti PM -> mulai ulang pilihan (porsi per hari beda PM lain)
   updateMenuCalcPmValueDisplay();
   const pmId = document.getElementById('menuCalcPmSelect').value;
-  if(pmId) loadMenuCalcData(pmId);
+  if(pmId) loadMenuCalcData(pmId); // resetMenuCalcSelections/muat pilihan tersimpan ditangani di dalam loadMenuCalcData
   else document.getElementById('menuCalcMatrix').style.display = 'none';
 });
 
@@ -1277,9 +1314,16 @@ async function loadMenuCalcData(pmId){
   try{ result = await api('getMenuCalcData', { pmId }); }
   catch(e){ toast(e.message, true); matrix.style.display = 'none'; return; }
 
+  menuCalcCurrentPmId = pmId;
   menuCalcItemsCache = result.items || [];
   menuCalcPorsiPerDay = result.porsiPerDay || {};
   menuCalcBumbuAvgHargaPerPorsi = result.bumbuAvgHargaPerPorsi || 0;
+
+  // Muat pilihan yang sudah pernah disimpan untuk SPPG+PM ini (kalau ada) -- jadi default auto-fill.
+  // Kalau belum pernah disimpan sama sekali, mulai kosong seperti biasa.
+  if(!deserializeMenuCalcState(result.savedState)){
+    resetMenuCalcSelections();
+  }
   renderMenuCalcMatrix();
 }
 
@@ -1345,27 +1389,34 @@ function renderMenuCalcMatrix(){
     body.appendChild(tr);
   });
 
+  const isReadOnlyViewer = ['dapur','suplier'].includes(state.role); // Monitoring & Suplier cuma boleh lihat, tidak boleh ubah pilihan
+
   body.querySelectorAll('.menu-calc-cell-btn').forEach(btn => {
+    if(isReadOnlyViewer){ btn.disabled = true; return; }
     btn.addEventListener('click', () => openMenuCalcCellPicker(btn.dataset.group, btn.dataset.day));
   });
 
   body.querySelectorAll('.menu-calc-bumbu-toggle-btn').forEach(btn => {
+    if(isReadOnlyViewer){ btn.disabled = true; return; }
     btn.addEventListener('click', () => {
       const day = btn.dataset.day;
       const set = menuCalcSelections['Bumbu'][day];
       if(set.has(MENU_CALC_BUMBU_AVG_KEY)) set.delete(MENU_CALC_BUMBU_AVG_KEY);
       else set.add(MENU_CALC_BUMBU_AVG_KEY);
       refreshMenuCalcDisplay();
+      saveMenuCalcStateToServer();
     });
   });
 
   body.querySelectorAll('.menu-calc-bumbu-mode-btn').forEach(btn => {
+    if(isReadOnlyViewer){ btn.disabled = true; return; }
     btn.addEventListener('click', () => {
       if(btn.dataset.mode === menuCalcBumbuMode) return;
       menuCalcBumbuMode = btn.dataset.mode;
       menuCalcSelections['Bumbu'] = {}; // ganti mode -> kosongkan pilihan Bumbu (struktur datanya beda), group lain tidak kesentuh
       MENU_CALC_DAYS.forEach(d => { menuCalcSelections['Bumbu'][d] = new Set(); });
       renderMenuCalcMatrix();
+      saveMenuCalcStateToServer();
     });
   });
 
@@ -1412,7 +1463,68 @@ function refreshMenuCalcDisplay(){
 
   const grandCell = document.getElementById('menuCalcGrandTotal');
   if(grandCell) grandCell.innerHTML = `<b>${fmtRupiah(grandTotal)}</b>`;
+
+  updateMenuCalcTransferButton(grandTotal);
 }
+
+/**
+ * Tombol "Transfer Data ke PO":
+ * - TERLIHAT untuk Ahli Gizi, Keuangan, Monitoring (dan Admin).
+ * - AKTIF (bisa ditekan) cuma kalau Total Harga seminggu berada di rentang 90%-100% dari Nilai PM (Kuota).
+ * - Yang benar-benar bisa MENGEKSEKUSI (klik jalan) cuma Keuangan (dan Admin).
+ */
+function updateMenuCalcTransferButton(grandTotal){
+  const wrap = document.getElementById('menuCalcTransferWrap');
+  const btn = document.getElementById('menuCalcTransferBtn');
+  const hint = document.getElementById('menuCalcTransferHint');
+  const canSeeTransfer = ['ahli_gizi','keuangan','dapur','admin'].includes(state.role);
+  const canExecuteTransfer = ['admin','keuangan'].includes(state.role);
+
+  if(!canSeeTransfer){ wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+
+  const sel = document.getElementById('menuCalcPmSelect');
+  const pm = pmListCache.find(p => p['ID PM'] === sel.value);
+  const kuota = pm ? Number(pm['Kuota Belanja']) || 0 : 0;
+  const pct = kuota > 0 ? (grandTotal / kuota) * 100 : 0;
+  const inRange = pct >= 90 && pct <= 100;
+
+  if(!pm){
+    btn.disabled = true;
+    hint.textContent = 'Pilih PM dulu.';
+  } else if(!inRange){
+    btn.disabled = true;
+    hint.textContent = `Total Harga saat ini ${pct.toFixed(1)}% dari Nilai PM -- harus 90%-100% dulu supaya tombol ini aktif.`;
+  } else if(!canExecuteTransfer){
+    btn.disabled = true;
+    hint.textContent = `Total Harga sudah ${pct.toFixed(1)}% dari Nilai PM (memenuhi syarat) -- tinggal menunggu Keuangan menekan tombol ini.`;
+  } else {
+    btn.disabled = false;
+    hint.textContent = `Total Harga ${pct.toFixed(1)}% dari Nilai PM -- siap ditransfer ke PO (Bumbu tidak ikut dipindahkan).`;
+  }
+}
+
+document.getElementById('menuCalcTransferBtn').addEventListener('click', async () => {
+  const pmId = document.getElementById('menuCalcPmSelect').value;
+  if(!pmId) return;
+  if(!(await showConfirm(
+    'Pindahkan semua item yang sudah dipilih (kecuali Bumbu) ke Daftar PO sesuai tanggal masing-masing hari? Aksi ini akan menambah baris PO baru.',
+    'Ya, Transfer'
+  ))) return;
+  const btn = document.getElementById('menuCalcTransferBtn');
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.textContent = 'Memindahkan...';
+  try{
+    const result = await api('transferMenuCalcToPO', { pmId });
+    toast(`${result.count} item berhasil dipindahkan ke PO`);
+  } catch(e){
+    toast(e.message, true);
+  } finally {
+    btn.textContent = original;
+    refreshMenuCalcDisplay(); // hitung ulang status tombol (disabled/enabled)
+  }
+});
 
 /* ---- Popup pilih item (multi-centang) untuk 1 sel Group x Hari ---- */
 let menuCalcCellPickerCtx = null; // { group, day, tempSelected: Set }
@@ -1459,6 +1571,7 @@ document.getElementById('menuCalcCellDoneBtn').addEventListener('click', () => {
     const { group, day, tempSelected } = menuCalcCellPickerCtx;
     menuCalcSelections[group][day] = tempSelected;
     refreshMenuCalcDisplay();
+    saveMenuCalcStateToServer();
   }
   document.getElementById('menuCalcCellOverlay').classList.remove('show');
   menuCalcCellPickerCtx = null;
