@@ -325,7 +325,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="pmDaftarCard">
         <div class="card-head">
           <h2>Daftar PM</h2>
           <button class="refresh-btn" onclick="refreshView(this, loadPM)" title="Refresh">↻</button>
@@ -341,9 +341,15 @@
           <h2>Kalkulator Matriks Menu</h2>
         </div>
         <p class="helptext" style="margin:-6px 0 12px;">Tiap sel bisa pilih lebih dari 1 item (tap sel untuk buka pilihan). Harga per porsi diambil dari kolom "Harga per Porsi" di Item Master (Unit Price ÷ Qty per Unit), dikali porsi PM hari yang sedang dihitung.</p>
-        <div class="field" style="max-width:320px; margin-bottom:14px;">
-          <label>PM</label>
-          <select id="menuCalcPmSelect"></select>
+        <div class="row" style="align-items:flex-end; gap:16px; margin-bottom:14px;">
+          <div class="field" style="max-width:320px; margin:0;">
+            <label>PM</label>
+            <select id="menuCalcPmSelect"></select>
+          </div>
+          <div class="summary-item" id="menuCalcPmValueWrap" style="display:none; margin:0;">
+            <div class="label">Nilai PM (Kuota)</div>
+            <div class="value" id="menuCalcPmValue">Rp0</div>
+          </div>
         </div>
         <div class="table-wrap"><table class="compact-table" id="menuCalcMatrix" style="display:none;">
           <thead><tr id="menuCalcMatrixHead"></tr></thead>
@@ -561,6 +567,7 @@
               <option value="keuangan">Pengawas Keuangan (PM/PO/Item)</option>
               <option value="do_maker">DO Maker (cetak DO saja, tanpa lihat harga)</option>
               <option value="ops_maker">PO Ops Maker (PO &amp; Item operasional saja)</option>
+              <option value="ahli_gizi">Ahli Gizi (Kalkulator Matriks Menu saja)</option>
               <option value="dapur">Monitoring (read-only)</option>
               <option value="investor">Investor (lihat semua termasuk modal, read-only)</option>
               <option value="admin">admin (akses penuh 1 SPPG)</option>
@@ -1025,9 +1032,9 @@ async function boot(){
 
 const TAB_DEFS = [
   { id:'approval', label:'Persetujuan SPPG', roles:['superadmin'] },
-  { id:'pm', label:'PM', roles:['admin','keuangan'] },
+  { id:'pm', label:'PM', roles:['admin','keuangan','ahli_gizi'] },
   { id:'po', label:'PO', roles:['admin','keuangan','suplier','dapur','investor','do_maker','ops_maker'] },
-  { id:'item', label:'Item Master', roles:['admin','keuangan','ops_maker','suplier'] },
+  { id:'item', label:'Item Master', roles:['admin','keuangan','ops_maker','suplier','ahli_gizi'] },
   { id:'laporan', label:'Laporan', roles:['admin','suplier','investor'] },
   { id:'users', label:'Kelola User', roles:['admin','superadmin'] }
 ];
@@ -1123,12 +1130,17 @@ let editingPmId = null; // ID PM yang sedang diedit (kalau tanggal yang dipilih 
 
 async function loadPM(){
   const canEdit = ['admin','keuangan'].includes(state.role);
+  const canUseMenuCalc = ['admin','keuangan','ahli_gizi'].includes(state.role);
   const isAdmin = state.role === 'admin';
+  const isAhliGizi = state.role === 'ahli_gizi';
   document.getElementById('pmFormCard').style.display = canEdit ? 'block' : 'none';
+  // Ahli Gizi cuma untuk Kalkulator Matriks Menu -- tidak perlu lihat Daftar PM (Kuota/Realisasi/Selisih) sama sekali.
+  document.getElementById('pmDaftarCard').style.display = isAhliGizi ? 'none' : 'block';
   let list = [];
   try{ list = await api('getPM', {}); }catch(e){ toast(e.message, true); }
   pmListCache = list;
   if(canEdit){ restorePmFormDefaults(); }
+  if(!isAhliGizi){
   const tb = document.getElementById('pmTableBody'); tb.innerHTML = '';
   const colCount = canEdit ? 6 : 5;
   if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Belum ada data PM</td></tr>`; }
@@ -1184,10 +1196,11 @@ async function loadPM(){
     tb.appendChild(tr);
   });
   loadPmDropdownForPO(list);
+  } // tutup blok if(!isAhliGizi)
 
-  // Kalkulator Susunan Bahan Baku -- sub-fitur PM, khusus role yang kelola PM (Admin/Keuangan)
-  document.getElementById('menuCalcCard').style.display = canEdit ? 'block' : 'none';
-  if(canEdit) populateMenuCalcPmSelect(list);
+  // Kalkulator Matriks Menu -- sub-fitur PM, untuk role yang kelola PM (Admin/Keuangan) DAN Ahli Gizi
+  document.getElementById('menuCalcCard').style.display = canUseMenuCalc ? 'block' : 'none';
+  if(canUseMenuCalc) populateMenuCalcPmSelect(list);
 }
 
 /* ---------------- KALKULATOR MATRIKS MENU (sub-fitur PM) ---------------- */
@@ -1216,6 +1229,7 @@ function selectPmForMenuCalc(pmId){
   }
   sel.value = pmId;
   resetMenuCalcSelections(); // ganti PM -> mulai ulang pilihan
+  updateMenuCalcPmValueDisplay();
   loadMenuCalcData(pmId);
   document.getElementById('menuCalcCard').scrollIntoView({ behavior:'smooth', block:'start' });
 }
@@ -1234,12 +1248,24 @@ function populateMenuCalcPmSelect(list){
     const defaultPm = editable.find(pm => todayStr >= isoDate(pm['Mulai']) && todayStr <= isoDate(pm['Sampai']));
     if(defaultPm) sel.value = defaultPm['ID PM'];
   }
+  updateMenuCalcPmValueDisplay();
   if(sel.value) loadMenuCalcData(sel.value);
   else document.getElementById('menuCalcMatrix').style.display = 'none';
 }
 
+/** Tampilkan "Nilai PM" (Kuota Belanja) di sebelah kanan dropdown, mengikuti PM yang sedang dipilih. */
+function updateMenuCalcPmValueDisplay(){
+  const sel = document.getElementById('menuCalcPmSelect');
+  const wrap = document.getElementById('menuCalcPmValueWrap');
+  const pm = pmListCache.find(p => p['ID PM'] === sel.value);
+  if(!pm){ wrap.style.display = 'none'; return; }
+  document.getElementById('menuCalcPmValue').textContent = fmtRupiah(pm['Kuota Belanja']);
+  wrap.style.display = 'block';
+}
+
 document.getElementById('menuCalcPmSelect').addEventListener('change', () => {
   resetMenuCalcSelections(); // ganti PM -> mulai ulang pilihan (porsi per hari beda PM lain)
+  updateMenuCalcPmValueDisplay();
   const pmId = document.getElementById('menuCalcPmSelect').value;
   if(pmId) loadMenuCalcData(pmId);
   else document.getElementById('menuCalcMatrix').style.display = 'none';
@@ -2029,18 +2055,19 @@ async function loadItemMaster(){
   const canDeleteGeneral = ['admin'].includes(state.role); // boleh hapus item APA SAJA
   const canDeleteBahanBakuOnly = ['keuangan'].includes(state.role); // boleh hapus KHUSUS item Bahan Baku
   const canDeleteOpsOnly = ['ops_maker'].includes(state.role); // boleh hapus KHUSUS item Operasional
-  itemRoleFlags = { canManageDescriptive, canEditUnitPriceGeneral, canEditUnitPriceOpsOnly, canSeeModalRef, canDeleteGeneral, canDeleteBahanBakuOnly, canDeleteOpsOnly };
+  const isAhliGizi = state.role === 'ahli_gizi'; // tampilan sangat terbatas: Item, Satuan, Group, Kategori, Qty per Unit saja
+  itemRoleFlags = { canManageDescriptive, canEditUnitPriceGeneral, canEditUnitPriceOpsOnly, canSeeModalRef, canDeleteGeneral, canDeleteBahanBakuOnly, canDeleteOpsOnly, isAhliGizi };
   document.getElementById('itemFormCard').style.display = canManageDescriptive ? 'block' : 'none';
 
   // PO Ops Maker cuma boleh lihat/kelola item Operasional -- kunci tombol kategorinya, sembunyikan pilihan Bahan Baku.
-  // Keuangan sebaliknya cuma boleh lihat/kelola item Bahan Baku -- kunci ke situ, sembunyikan pilihan Operasional.
+  // Keuangan & Ahli Gizi sebaliknya cuma boleh lihat item Bahan Baku -- kunci ke situ, sembunyikan pilihan Operasional.
   const katWrap = document.getElementById('itemKatBahanBakuBtn').parentElement;
   if(state.role === 'ops_maker'){
     itemKategoriFilter = 'operasional';
     katWrap.style.display = 'none';
     document.getElementById('itemKategoriField').style.display = 'none'; // dropdown Kategori di form Tambah/Edit juga disembunyikan (selalu operasional)
     document.getElementById('itemKategori').value = 'operasional';
-  } else if(state.role === 'keuangan'){
+  } else if(state.role === 'keuangan' || isAhliGizi){
     itemKategoriFilter = 'bahan baku';
     katWrap.style.display = 'none';
     document.getElementById('itemKategoriField').style.display = 'none'; // dropdown Kategori di form Tambah/Edit juga disembunyikan (selalu bahan baku)
@@ -2077,29 +2104,29 @@ document.querySelectorAll('.item-kategori-btn').forEach(btn => {
 document.getElementById('itemSearchInput').addEventListener('input', applyItemFilters);
 
 function renderItemMasterRows(list){
-  const { canManageDescriptive, canEditUnitPriceGeneral, canEditUnitPriceOpsOnly, canSeeModalRef, canDeleteGeneral, canDeleteBahanBakuOnly, canDeleteOpsOnly } = itemRoleFlags;
+  const { canManageDescriptive, canEditUnitPriceGeneral, canEditUnitPriceOpsOnly, canSeeModalRef, canDeleteGeneral, canDeleteBahanBakuOnly, canDeleteOpsOnly, isAhliGizi } = itemRoleFlags;
   // Daftar item yang masuk ke sini SUDAH difilter backend sesuai kategori yang boleh dilihat role ini
   // (Keuangan cuma dapat bahan baku, Ops Maker cuma dapat operasional) -- jadi cukup gabungan OR biasa.
   const canDelete = canDeleteGeneral || canDeleteBahanBakuOnly || canDeleteOpsOnly;
-  // Qty per Unit boleh diisi Admin, Keuangan, Ops Maker (biasa via form penuh), DAN Suplier (khusus kolom ini saja, inline).
-  const canEditQtyPerUnit = ['admin','keuangan','ops_maker','suplier'].includes(state.role);
+  // Qty per Unit boleh diisi Admin, Keuangan, Ops Maker (biasa via form penuh), Suplier, DAN Ahli Gizi (khusus kolom ini saja, inline).
+  const canEditQtyPerUnit = ['admin','keuangan','ops_maker','suplier','ahli_gizi'].includes(state.role);
 
   const head = document.getElementById('itemTableHead');
   head.innerHTML = `<th>Item</th><th>Satuan</th><th>Group</th><th>Kategori</th>
-    <th class="right">Unit Price</th>
+    ${isAhliGizi ? '' : '<th class="right">Unit Price</th>'}
     <th class="right">Qty per Unit</th>
-    <th class="right">Harga per Porsi</th>
+    ${isAhliGizi ? '' : '<th class="right">Harga per Porsi</th>'}
     ${canSeeModalRef ? '<th class="right">Modal Per Unit <span style="font-weight:400; text-transform:none;">(ref.)</span></th>' : ''}
     ${(canManageDescriptive||canDelete) ? '<th></th>' : ''}`;
 
   const tb = document.getElementById('itemTableBody'); tb.innerHTML = '';
-  const colCount = 7 + (canSeeModalRef?1:0) + ((canManageDescriptive||canDelete)?1:0);
+  const colCount = (isAhliGizi ? 5 : 7) + (canSeeModalRef?1:0) + ((canManageDescriptive||canDelete)?1:0);
   if(!list.length){ tb.innerHTML = `<tr><td colspan="${colCount}" class="empty">Tidak ada item yang cocok</td></tr>`; return; }
   list.forEach(it => {
     const tr = document.createElement('tr');
     const isOperasional = String(it['Kategori']||'').trim().toLowerCase() === 'operasional';
     const canEditThisPrice = canEditUnitPriceGeneral || (canEditUnitPriceOpsOnly && isOperasional); // per baris
-    const modalCell = `<td data-label="Unit Price" class="right">${canEditThisPrice
+    const modalCell = isAhliGizi ? '' : `<td data-label="Unit Price" class="right">${canEditThisPrice
       ? `<input class="price-input mono item-modal-input" type="number" value="${it['Unit Price']||''}" placeholder="isi" data-id="${it['ID']}" data-nama="${it['Item']}">`
       : `<span class="num">${it['Unit Price'] ? fmtRupiah(it['Unit Price']) : '-'}</span>`}</td>`;
     const qtyPerUnit = Number(it['Qty per Unit']) || 0;
@@ -2108,7 +2135,7 @@ function renderItemMasterRows(list){
     const qtyPerUnitCell = `<td data-label="Qty per Unit" class="right">${canEditQtyPerUnit
       ? `<input class="price-input mono item-qtyperunit-input" type="number" step="any" value="${qtyPerUnit||''}" placeholder="isi" data-id="${it['ID']}">`
       : `<span class="num">${qtyPerUnit || '-'}</span>`}</td>`;
-    const hargaPerPorsiCell = `<td data-label="Harga per Porsi" class="right num">${hargaPerPorsi ? fmtRupiah(hargaPerPorsi) : '-'}</td>`;
+    const hargaPerPorsiCell = isAhliGizi ? '' : `<td data-label="Harga per Porsi" class="right num">${hargaPerPorsi ? fmtRupiah(hargaPerPorsi) : '-'}</td>`;
     const modalRefCell = canSeeModalRef
       ? `<td data-label="Modal Per Unit" class="right num">${it['Modal Per Unit'] ? fmtRupiah(it['Modal Per Unit']) : '-'}</td>` : '';
     const actionCell = (canManageDescriptive||canDelete) ? `<td data-label="">
