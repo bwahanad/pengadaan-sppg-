@@ -393,6 +393,7 @@
             <button class="btn btn-ghost btn-sm" id="openPrintDoBtn" style="display:none;">🖨 Print DO</button>
             <button class="btn btn-accent btn-sm" id="openWaSendBtn" style="display:none;">Kirim PO ke WA Suplier</button>
             <button class="btn btn-accent btn-sm" id="openWaSendDoBtn" style="display:none;">Kirim PO ke WA DO Maker</button>
+            <button class="btn btn-ghost btn-sm" id="backfillPricesBtn" style="display:none;" title="Isi ulang Harga Satuan/Modal Per Unit yang masih kosong di PO, memakai referensi Item Master saat ini">🔄 Isi Harga Kosong</button>
             <button class="refresh-btn" onclick="refreshView(this, loadPO)" title="Refresh">↻</button>
           </div>
         </div>
@@ -1703,6 +1704,7 @@ async function loadPO(){
   document.getElementById('openWaSendDoBtn').style.display = (state.role === 'suplier') ? 'inline-flex' : 'none';
   document.getElementById('openPrintDoBtn').style.display = canPrintDo ? 'inline-flex' : 'none';
   document.getElementById('openInvoiceBtn').style.display = canInvoice ? 'inline-flex' : 'none';
+  document.getElementById('backfillPricesBtn').style.display = canSendWaToSuplier ? 'inline-flex' : 'none'; // sama-sama admin/keuangan
 
   // Kunci tombol kategori ke "Operasional" untuk PO Ops Maker -- tidak boleh lihat/pindah ke Bahan Baku sama sekali.
   if(state.role === 'ops_maker'){
@@ -2420,6 +2422,27 @@ function normalizeWaNumber(raw){
   else if(digits.startsWith('8')) digits = '62' + digits;
   return digits;
 }
+
+document.getElementById('backfillPricesBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('backfillPricesBtn');
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.textContent = 'Memproses...';
+  try{
+    const result = await api('backfillPOPrices', {});
+    if(result.updated > 0){
+      toast(`${result.updated} baris PO berhasil diisi ulang`);
+      loadPO();
+    } else {
+      toast('Tidak ada baris PO yang perlu diisi ulang (semua sudah terisi, atau item-nya belum punya referensi harga di Item Master)');
+    }
+  } catch(e){
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+});
 
 document.getElementById('openWaSendBtn').addEventListener('click', async () => {
   const overlay = document.getElementById('waSendOverlay');
