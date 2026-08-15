@@ -1614,6 +1614,7 @@ function cancelEditPm(){
 }
 
 const PM_FIELD_IDS = ['pmMulai','pmSampai','pk_sen','pk_sel','pk_rab','pk_kam','pk_jum','pk_sab','pb_sen','pb_sel','pb_rab','pb_kam','pb_jum','pb_sab'];
+const PM_RESTORABLE_FIELD_IDS = ['pk_sen','pk_sel','pk_rab','pk_kam','pk_jum','pk_sab','pb_sen','pb_sel','pb_rab','pb_kam','pb_jum','pb_sab']; // TANPA pmMulai/pmSampai -- tanggal selalu kosong tiap buka aplikasi lagi (login baru), tidak ikut diingat
 function pmDefaultsStorageKey(){ return 'pmFormDefaults_' + (state.sppgId || 'unknown'); }
 
 function savePmFormDefaults(){
@@ -1626,7 +1627,7 @@ function restorePmFormDefaults(){
   let values = null;
   try{ values = JSON.parse(localStorage.getItem(pmDefaultsStorageKey())); }catch(e){}
   if(!values) return;
-  PM_FIELD_IDS.forEach(id => {
+  PM_RESTORABLE_FIELD_IDS.forEach(id => {
     const el = document.getElementById(id);
     if(el && !el.value && values[id]) el.value = values[id];
   });
@@ -1638,7 +1639,19 @@ document.getElementById('pmCancelEditBtn').addEventListener('click', cancelEditP
 document.getElementById('savePmBtn').addEventListener('click', async () => {
   const mulai = document.getElementById('pmMulai').value;
   const sampai = document.getElementById('pmSampai').value;
-  if(!mulai || !sampai){ toast('Isi tanggal Mulai & Sampai', true); return; }
+
+  // Semua kolom wajib diisi -- minimal angka 0 (bukan dibiarkan kosong), tidak cuma tanggal.
+  const missingLabels = [];
+  if(!mulai) missingLabels.push('Mulai');
+  if(!sampai) missingLabels.push('Sampai');
+  HARI.forEach(h => {
+    if(document.getElementById('pk_'+h).value === '') missingLabels.push('PM Kecil ' + HARI_LABEL[h]);
+    if(document.getElementById('pb_'+h).value === '') missingLabels.push('PM Besar ' + HARI_LABEL[h]);
+  });
+  if(missingLabels.length){
+    await showAlert('Kolom berikut belum diisi (isi minimal angka 0):\n' + missingLabels.join(', '));
+    return;
+  }
 
   if(!editingPmId){
     const overlap = findOverlappingPm(mulai, sampai);
@@ -1647,6 +1660,11 @@ document.getElementById('savePmBtn').addEventListener('click', async () => {
       return;
     }
   }
+
+  if(!(await showConfirm(
+    (editingPmId ? 'Update' : 'Simpan') + ' PM periode ' + fmtDate(mulai) + ' – ' + fmtDate(sampai) + '?',
+    editingPmId ? 'Ya, Update' : 'Ya, Simpan'
+  ))) return;
 
   const data = { 'Mulai': mulai, 'Sampai': sampai };
   HARI.forEach(h => {
