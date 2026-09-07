@@ -858,6 +858,10 @@ window.onload = () => {
     document.getElementById('loginError').textContent = 'Aplikasi belum dikonfigurasi (Client ID kosong). Hubungi admin.';
     return;
   }
+  // Kalau ada sesi yang masih berlaku (< 24 jam sejak verifikasi Google terakhir), langsung masuk
+  // tanpa perlu verifikasi Google lagi -- tidak perlu render tombol Sign In sama sekali.
+  if(tryRestoreSession()) return;
+
   google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogleCredential, use_fedcm_for_button: true });
   google.accounts.id.renderButton(document.getElementById('gsiBtn'), { theme:'outline', size:'large', shape:'pill', text:'signin_with' });
 };
@@ -898,6 +902,8 @@ async function onGoogleCredential(response){
     const json = await postWithRetry_({ action:'login', idToken: state.idToken });
     if(!json.ok) throw new Error(json.error);
     state.email = json.data.email; state.nama = json.data.nama; state.options = json.data.options;
+
+    if(!json.data.newUser) saveSessionFresh(); // mulai jam sesi 24 jam yang baru -- HANYA saat verifikasi Google benar-benar baru terjadi
 
     if(json.data.newUser){
       showRegister();
@@ -1003,8 +1009,59 @@ function showPicker(){
   });
 }
 
+/* ---------------- SESI LOGIN STANDBY 24 JAM ---------------- */
+// Supaya tidak perlu verifikasi Google berulang tiap buka aplikasi -- sekali verifikasi berlaku
+// selama 24 jam dari SAAT VERIFIKASI ITU (bukan diperpanjang tiap ganti SPPG/aktivitas biasa).
+const SESSION_KEY = 'appSession_v1';
+const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/** Dipanggil SEKALI tiap kali baru saja verifikasi Google berhasil -- set jam mulai sesi yang baru. */
+function saveSessionFresh(){
+  try{
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      email: state.email, nama: state.nama, options: state.options,
+      selected: null, ts: Date.now()
+    }));
+  }catch(e){}
+}
+
+/** Dipanggil tiap kali pilih/ganti SPPG -- update pilihan yang aktif TANPA mengubah jam mulai sesi. */
+function updateSessionSelection(){
+  try{
+    const raw = localStorage.getItem(SESSION_KEY);
+    const session = raw ? JSON.parse(raw) : { ts: Date.now() };
+    session.email = state.email; session.nama = state.nama; session.options = state.options;
+    session.selected = { role: state.role, sppgId: state.sppgId, sppgNama: state.sppgNama };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  }catch(e){}
+}
+
+function clearSession(){
+  try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
+}
+
+/** Dipanggil sekali di window.onload. Balikin true kalau berhasil masuk otomatis tanpa perlu login lagi. */
+function tryRestoreSession(){
+  try{
+    const raw = localStorage.getItem(SESSION_KEY);
+    if(!raw) return false;
+    const session = JSON.parse(raw);
+    if(!session || !session.email || !session.selected) return false;
+    if(Date.now() - session.ts > SESSION_MAX_AGE_MS){ clearSession(); return false; } // lebih dari 24 jam -- wajib verifikasi ulang
+    state.email = session.email;
+    state.nama = session.nama;
+    state.options = session.options || [];
+    state.role = session.selected.role;
+    state.sppgId = session.selected.sppgId;
+    state.sppgNama = session.selected.sppgNama;
+    boot();
+    return true;
+  }catch(e){ return false; }
+}
+
 function selectSppg(o){
   state.role = o.role; state.sppgId = o.sppgId; state.sppgNama = o.sppgNama;
+  updateSessionSelection();
   boot();
 }
 
@@ -1015,6 +1072,7 @@ document.getElementById('switchSppgBtn').addEventListener('click', () => {
 });
 
 document.getElementById('logoutBtn').addEventListener('click', () => {
+  clearSession(); // keluar manual = wajib verifikasi Google lagi lain kali, tidak nunggu 24 jam
   state = { email:null, nama:null, role:null, sppgId:null, sppgNama:null, options:[] };
   document.getElementById('app').style.display = 'none';
   document.getElementById('pickerScreen').style.display = 'none';
