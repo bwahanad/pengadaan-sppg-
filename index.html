@@ -3042,26 +3042,30 @@ async function renderInvoicePreview(doc){
   wrap.innerHTML = '<p class="helptext">Memuat preview...</p>';
   if(!window.pdfjsLib){
     try{ await ensurePdfJsLoaded(); }
-    catch(e){ wrap.innerHTML = '<p class="helptext">Gagal memuat library preview, cek koneksi internet.</p>'; return; }
+    catch(e){ wrap.innerHTML = '<p class="helptext">Gagal memuat library preview, cek koneksi internet lalu tap "Preview Invoice" lagi.</p>'; return; }
   }
 
-  const arrayBuffer = doc.output('arraybuffer');
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  wrap.innerHTML = '';
-  for(let i=1; i<=pdf.numPages; i++){
-    const page = await pdf.getPage(i);
-    const viewport = page.getViewport({ scale: 1.6 });
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    canvas.style.width = '100%';
-    canvas.style.maxWidth = '480px';
-    canvas.style.marginBottom = '8px';
-    canvas.style.boxShadow = '0 1px 6px rgba(0,0,0,.18)';
-    canvas.style.background = '#fff';
-    wrap.appendChild(canvas);
-    const ctx = canvas.getContext('2d');
-    await page.render({ canvasContext: ctx, viewport }).promise;
+  try{
+    const arrayBuffer = doc.output('arraybuffer');
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    wrap.innerHTML = '';
+    for(let i=1; i<=pdf.numPages; i++){
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 1.6 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      canvas.style.width = '100%';
+      canvas.style.maxWidth = '480px';
+      canvas.style.marginBottom = '8px';
+      canvas.style.boxShadow = '0 1px 6px rgba(0,0,0,.18)';
+      canvas.style.background = '#fff';
+      wrap.appendChild(canvas);
+      const ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport }).promise;
+    }
+  } catch(e){
+    wrap.innerHTML = '<p class="helptext">Gagal menampilkan preview (' + e.message + '). Coba tap "Unduh PDF" langsung di bawah -- filenya tetap bisa dibuat walau preview-nya gagal tampil.</p>';
   }
 }
 
